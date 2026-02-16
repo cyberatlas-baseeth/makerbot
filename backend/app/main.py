@@ -1,7 +1,8 @@
 """
 FastAPI application entry point.
 
-Initializes all modules and starts the trading engine on startup.
+Initializes all modules. Trading engine starts AFTER frontend sends
+the JWT token via POST /api/auth/start (MetaMask sign-in flow).
 Runs locally on localhost:8000.
 """
 
@@ -47,30 +48,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     broadcast_task: asyncio.Task[None] | None = None
     try:
-        # 1. Authenticate with StandX
-        if settings.private_key and settings.private_key != "your_private_key_here":
-            try:
-                await auth_manager.login()
-                log.info("app.authenticated")
-            except Exception as e:
-                log.error("app.auth_failed", error=str(e))
-                log.warning("app.running_without_auth")
-        else:
-            log.warning("app.no_private_key — running in monitor-only mode")
-
-        # 2. Start market data WebSocket feed
+        # Start market data WebSocket feed (public, no auth needed)
         await market_data_client.start()
 
-        # 3. Wait briefly for initial orderbook data
+        # Wait briefly for initial orderbook data
         await asyncio.sleep(2.0)
 
-        # 4. Start trading engine
-        if settings.private_key and settings.private_key != "your_private_key_here":
-            await trading_engine.start()
-        else:
-            log.warning("app.engine_not_started — no private key configured")
+        # Engine will be started by POST /api/auth/start after MetaMask login
+        log.info(
+            "app.waiting_for_auth",
+            message="Connect wallet via dashboard to start trading engine",
+        )
 
-        # 5. Start WebSocket broadcast to frontend
+        # Start WebSocket broadcast to frontend
         broadcast_task = asyncio.create_task(ws.broadcast_loop())
 
         log.info("app.started", api="http://localhost:8000", docs="http://localhost:8000/docs")

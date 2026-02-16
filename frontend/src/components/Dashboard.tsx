@@ -9,8 +9,16 @@ import ConfigPanel from './ConfigPanel';
 // Hardcoded localhost — this bot runs locally only
 const WS_URL = 'ws://localhost:8000/ws';
 
-export default function Dashboard() {
+interface DashboardProps {
+    address: string;
+}
+
+export default function Dashboard({ address }: DashboardProps) {
     const { state, connected } = useWebSocket(WS_URL);
+
+    const shortAddress = address
+        ? `${address.slice(0, 6)}...${address.slice(-4)}`
+        : '';
 
     return (
         <div className="min-h-screen bg-bg-primary">
@@ -36,6 +44,11 @@ export default function Dashboard() {
                         <span className="text-xs text-text-muted font-mono bg-bg-secondary px-3 py-1.5 rounded-lg border border-border">
                             {state.symbol}
                         </span>
+                        {shortAddress && (
+                            <span className="text-xs font-mono bg-green-500/10 text-green-400 px-3 py-1.5 rounded-lg border border-green-500/30">
+                                🦊 {shortAddress}
+                            </span>
+                        )}
                     </div>
                 </div>
             </header>

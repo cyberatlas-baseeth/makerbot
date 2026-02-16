@@ -10,7 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@noble/curves": "^2.0.1",
+    "@scure/base": "^2.0.0",
     "@tailwindcss/vite": "^4.1.18",
+    "ethers": "^6.16.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwindcss": "^4.1.18"

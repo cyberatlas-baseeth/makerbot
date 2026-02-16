@@ -1,183 +1,151 @@
 """
-StandX JWT Authentication via wallet signing.
+StandX Authentication via frontend wallet signing.
 
-Flow:
-1. Request a challenge/nonce from StandX API.
-2. Sign the challenge with the wallet private key (eth_account).
-3. Submit signature to receive a JWT access token + refresh token.
-4. Auto-refresh before expiry.
-5. Token stored in-memory only — never persisted to disk.
+Architecture:
+- Frontend connects MetaMask → signs message → gets JWT from StandX
+- Frontend sends JWT + ed25519 private key to backend via POST /api/auth/start
+- Backend stores token in memory and uses it for all StandX API calls
+- Backend generates ed25519 body signatures for each request
+
+The private key never leaves the user's browser/MetaMask.
 """
 
 from __future__ import annotations
 
 import asyncio
+import base64
 import time
+import uuid
 from typing import Any
 
 import httpx
-from eth_account import Account
-from eth_account.messages import encode_defunct
 
 from app.config import settings
 from app.logger import get_logger
 
 log = get_logger("auth")
 
+# Lazy import ed25519 — only needed for body signing
+_ed25519 = None
+
+
+def _get_ed25519():
+    global _ed25519
+    if _ed25519 is None:
+        try:
+            from nacl.signing import SigningKey  # type: ignore
+            _ed25519 = "nacl"
+        except ImportError:
+            _ed25519 = "none"
+    return _ed25519
+
 
 class AuthManager:
-    """Manages StandX JWT authentication lifecycle."""
+    """Manages StandX JWT token and request signing."""
 
     def __init__(self) -> None:
         self._access_token: str | None = None
-        self._refresh_token: str | None = None
-        self._token_expiry: float = 0.0
-        self._refresh_expiry: float = 0.0
+        self._wallet_address: str | None = None
+        self._chain: str | None = None
+        self._ed25519_private_key_bytes: bytes | None = None
+        self._request_id: str | None = None
+        self._token_set_at: float = 0.0
         self._lock = asyncio.Lock()
-        self._client = httpx.AsyncClient(
-            base_url=settings.standx_api_base,
-            timeout=10.0,
-        )
-        self._account = None
-        if settings.private_key and settings.private_key != "your_private_key_here":
-            try:
-                self._account = Account.from_key(settings.private_key)
-            except Exception as e:
-                log.warning("auth.invalid_private_key", error=str(e))
-        self._refresh_task: asyncio.Task[None] | None = None
 
     @property
     def wallet_address(self) -> str:
-        """Return the wallet address derived from the private key."""
-        if self._account is None:
-            return ""
-        return self._account.address
+        return self._wallet_address or ""
 
-    async def login(self) -> str:
-        """
-        Full login flow:
-        1. GET /auth/challenge?address=<wallet>
-        2. Sign the challenge message
-        3. POST /auth/login with address + signature
-        4. Store tokens in memory
-        """
-        if self._account is None:
-            raise RuntimeError("No private key configured — cannot authenticate.")
+    @property
+    def is_authenticated(self) -> bool:
+        return self._access_token is not None
 
-        address = self._account.address
-        log.info("auth.login.start", address=address)
-
-        # Step 1: Get challenge
-        resp = await self._client.get(
-            "/auth/challenge",
-            params={"address": address},
-        )
-        resp.raise_for_status()
-        challenge_data = resp.json()
-        challenge_message: str = challenge_data.get("message", challenge_data.get("challenge", ""))
-
-        # Step 2: Sign challenge
-        message = encode_defunct(text=challenge_message)
-        signed = self._account.sign_message(message)
-        signature = signed.signature.hex()
-        if not signature.startswith("0x"):
-            signature = "0x" + signature
-
-        # Step 3: Submit signature
-        resp = await self._client.post(
-            "/auth/login",
-            json={
-                "address": address,
-                "signature": signature,
-            },
-        )
-        resp.raise_for_status()
-        token_data = resp.json()
-
+    async def set_credentials(
+        self,
+        token: str,
+        address: str,
+        chain: str,
+        ed25519_private_key_hex: str,
+        request_id: str,
+    ) -> None:
+        """Store credentials received from frontend after MetaMask login."""
         async with self._lock:
-            self._access_token = token_data["access_token"]
-            self._refresh_token = token_data.get("refresh_token")
-            # Default: access token valid for 15 min, refresh for 24h
-            self._token_expiry = time.time() + token_data.get("expires_in", 900)
-            self._refresh_expiry = time.time() + token_data.get("refresh_expires_in", 86400)
+            self._access_token = token
+            self._wallet_address = address
+            self._chain = chain
+            self._ed25519_private_key_bytes = bytes.fromhex(ed25519_private_key_hex)
+            self._request_id = request_id
+            self._token_set_at = time.time()
 
-        log.info("auth.login.success", address=address)
-
-        # Start auto-refresh background task
-        if self._refresh_task is None or self._refresh_task.done():
-            self._refresh_task = asyncio.create_task(self._auto_refresh_loop())
-
-        return self._access_token  # type: ignore[return-value]
-
-    async def refresh(self) -> str:
-        """Refresh the access token using the refresh token."""
-        async with self._lock:
-            if not self._refresh_token:
-                raise RuntimeError("No refresh token available — must login first.")
-            refresh_tok = self._refresh_token
-
-        log.info("auth.refresh.start")
-        resp = await self._client.post(
-            "/auth/refresh",
-            json={"refresh_token": refresh_tok},
+        log.info(
+            "auth.credentials_set",
+            address=address,
+            chain=chain,
         )
-        resp.raise_for_status()
-        token_data = resp.json()
-
-        async with self._lock:
-            self._access_token = token_data["access_token"]
-            if "refresh_token" in token_data:
-                self._refresh_token = token_data["refresh_token"]
-            self._token_expiry = time.time() + token_data.get("expires_in", 900)
-
-        log.info("auth.refresh.success")
-        return self._access_token  # type: ignore[return-value]
 
     async def get_token(self) -> str:
-        """Return a valid access token, refreshing if needed."""
+        """Return the current access token."""
         async with self._lock:
-            token = self._access_token
-            expiry = self._token_expiry
-
-        if token is None:
-            return await self.login()
-
-        # Refresh 60 seconds before expiry
-        if time.time() > expiry - 60:
-            try:
-                return await self.refresh()
-            except Exception:
-                log.warning("auth.refresh.failed, re-logging in")
-                return await self.login()
-
-        return token
+            if self._access_token is None:
+                raise RuntimeError("Not authenticated — connect wallet via dashboard first.")
+            return self._access_token
 
     async def get_auth_headers(self) -> dict[str, str]:
-        """Return headers dict with Authorization bearer token."""
+        """Return headers with both Authorization and body signature."""
         token = await self.get_token()
         return {"Authorization": f"Bearer {token}"}
 
-    async def _auto_refresh_loop(self) -> None:
-        """Background loop that refreshes the token before expiry."""
-        while True:
+    def sign_request_body(self, payload: str) -> dict[str, str]:
+        """
+        Sign a request body per StandX's body signature flow.
+
+        Returns dict with x-request-* headers.
+        Uses ed25519 signing of: v1,{requestId},{timestamp},{payload}
+        """
+        if self._ed25519_private_key_bytes is None:
+            return {}
+
+        version = "v1"
+        request_id = str(uuid.uuid4())
+        timestamp = int(time.time() * 1000)
+        message = f"{version},{request_id},{timestamp},{payload}"
+        message_bytes = message.encode("utf-8")
+
+        # Sign with ed25519
+        try:
+            from nacl.signing import SigningKey  # type: ignore
+            signing_key = SigningKey(self._ed25519_private_key_bytes)
+            signed = signing_key.sign(message_bytes)
+            signature_b64 = base64.b64encode(signed.signature).decode("utf-8")
+        except ImportError:
+            # Fallback: try using cryptography library
             try:
-                async with self._lock:
-                    expiry = self._token_expiry
-                # Sleep until 90 seconds before expiry
-                sleep_for = max(expiry - time.time() - 90, 10)
-                await asyncio.sleep(sleep_for)
-                await self.refresh()
-            except asyncio.CancelledError:
-                break
+                from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+                private_key = Ed25519PrivateKey.from_private_bytes(self._ed25519_private_key_bytes)
+                signature = private_key.sign(message_bytes)
+                signature_b64 = base64.b64encode(signature).decode("utf-8")
             except Exception as e:
-                log.error("auth.auto_refresh.error", error=str(e))
-                await asyncio.sleep(30)
+                log.warning("auth.body_sign_failed", error=str(e))
+                return {}
+
+        return {
+            "x-request-sign-version": version,
+            "x-request-id": request_id,
+            "x-request-timestamp": str(timestamp),
+            "x-request-signature": signature_b64,
+        }
+
+    async def get_full_headers(self, payload: str = "") -> dict[str, str]:
+        """Get auth headers + body signature headers combined."""
+        headers = await self.get_auth_headers()
+        if payload:
+            sign_headers = self.sign_request_body(payload)
+            headers.update(sign_headers)
+        return headers
 
     async def close(self) -> None:
         """Cleanup resources."""
-        if self._refresh_task and not self._refresh_task.done():
-            self._refresh_task.cancel()
-        await self._client.aclose()
+        pass
 
 
 # Singleton

@@ -83,8 +83,9 @@ class TradingEngine:
         self._task: asyncio.Task[None] | None = None
         self._last_quote: Quote | None = None
         self._loop_count = 0
+        # Trading API uses perps.standx.com (not api.standx.com)
         self._client = httpx.AsyncClient(
-            base_url=settings.standx_api_base,
+            base_url="https://perps.standx.com",
             timeout=10.0,
         )
 
@@ -257,21 +258,24 @@ class TradingEngine:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, max=5))
     async def _place_order(self, side: str, price: float, size: float) -> str | None:
         """Place a limit order on StandX."""
-        headers = await auth_manager.get_auth_headers()
+        import json
         payload = {
             "symbol": settings.symbol,
             "side": side,
-            "type": "limit",
+            "order_type": "limit",
+            "qty": str(round(size, 8)),
             "price": str(round(price, 8)),
-            "size": str(round(size, 8)),
-            "time_in_force": "GTC",
-            "post_only": True,
+            "time_in_force": "gtc",
+            "reduce_only": False,
         }
+        payload_str = json.dumps(payload)
+        headers = await auth_manager.get_full_headers(payload_str)
+        headers["Content-Type"] = "application/json"
 
         try:
             resp = await self._client.post(
-                "/orders",
-                json=payload,
+                "/api/new_order",
+                content=payload_str,
                 headers=headers,
             )
             resp.raise_for_status()
@@ -297,10 +301,14 @@ class TradingEngine:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, max=5))
     async def _cancel_order(self, order_id: str) -> None:
         """Cancel a specific order."""
+        import json
         try:
-            headers = await auth_manager.get_auth_headers()
-            resp = await self._client.delete(
-                f"/orders/{order_id}",
+            payload = json.dumps({"order_id": order_id})
+            headers = await auth_manager.get_full_headers(payload)
+            headers["Content-Type"] = "application/json"
+            resp = await self._client.post(
+                "/api/cancel_order",
+                content=payload,
                 headers=headers,
             )
             resp.raise_for_status()
@@ -329,12 +337,15 @@ class TradingEngine:
             except Exception as e:
                 log.error("engine.cancel_all_error", order_id=oid, error=str(e))
 
-        # Also try bulk cancel via API
+        # Bulk cancel via API
+        import json
         try:
-            headers = await auth_manager.get_auth_headers()
-            await self._client.delete(
-                "/orders",
-                params={"symbol": settings.symbol},
+            payload = json.dumps({"symbol": settings.symbol})
+            headers = await auth_manager.get_full_headers(payload)
+            headers["Content-Type"] = "application/json"
+            await self._client.post(
+                "/api/cancel_all_orders",
+                content=payload,
                 headers=headers,
             )
             log.info("engine.bulk_cancel_sent")

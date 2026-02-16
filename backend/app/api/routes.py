@@ -2,12 +2,13 @@
 REST API routes for the market maker bot.
 
 Endpoints:
-  GET  /status     – Bot status, mid-price, spread
-  GET  /orders     – Active orders list
-  GET  /uptime     – Uptime stats (current hour + history)
-  GET  /positions  – Current position & PnL
-  POST /config     – Update spread_bps, order_size, refresh_interval
-  POST /kill       – Emergency kill-switch
+  POST /auth/start  – Receive JWT token from frontend MetaMask login
+  GET  /status      – Bot status, mid-price, spread
+  GET  /orders      – Active orders list
+  GET  /uptime      – Uptime stats (current hour + history)
+  GET  /positions   – Current position & PnL
+  POST /config      – Update spread_bps, order_size, refresh_interval
+  POST /kill        – Emergency kill-switch
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from pydantic import BaseModel
 
 from app.config import settings, update_runtime_settings
 from app.logger import get_logger
+from app.auth.jwt_auth import auth_manager
 
 log = get_logger("api")
 
@@ -39,31 +41,64 @@ def set_orderbook(orderbook: Any) -> None:
     _orderbook = orderbook
 
 
+# --- Auth Models ---
+
+class AuthStartRequest(BaseModel):
+    token: str
+    address: str
+    chain: str = "bsc"
+    ed25519_private_key_hex: str
+    request_id: str
+
+
 class ConfigUpdate(BaseModel):
     spread_bps: Optional[float] = None
     order_size: Optional[float] = None
     refresh_interval: Optional[float] = None
 
 
-class StatusResponse(BaseModel):
-    status: str
-    symbol: str
-    mid_price: Optional[float]
-    market_spread_bps: Optional[float]
-    configured_spread_bps: float
-    order_size: float
-    refresh_interval: float
-    active_order_count: int
-    loop_count: int
-    consecutive_failures: int
+# --- Auth Endpoint ---
 
+@router.post("/auth/start")
+async def auth_start(req: AuthStartRequest) -> dict[str, Any]:
+    """
+    Receive JWT token and ed25519 keys from frontend after MetaMask login.
+    Stores credentials and starts the trading engine if not already running.
+    """
+    await auth_manager.set_credentials(
+        token=req.token,
+        address=req.address,
+        chain=req.chain,
+        ed25519_private_key_hex=req.ed25519_private_key_hex,
+        request_id=req.request_id,
+    )
+
+    # Start engine if it exists and is not running
+    if _engine is not None:
+        from app.trading.engine import BotStatus
+        if _engine.status in (BotStatus.STARTING, BotStatus.PAUSED, BotStatus.KILLED):
+            await _engine.start()
+            log.info("api.engine_started_after_auth")
+
+    return {
+        "message": "Authenticated successfully",
+        "address": req.address,
+        "chain": req.chain,
+        "engine_started": _engine is not None,
+    }
+
+
+# --- Status Endpoints ---
 
 @router.get("/status")
 async def get_status() -> dict[str, Any]:
     """Get comprehensive bot status."""
     if _engine is None:
         raise HTTPException(status_code=503, detail="Engine not initialized")
-    return _engine.get_full_status()
+    status = _engine.get_full_status()
+    status["authenticated"] = auth_manager.is_authenticated
+    status["wallet_address"] = auth_manager.wallet_address
+    return status
 
 
 @router.get("/orders")

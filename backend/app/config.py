@@ -26,12 +26,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Secrets
-    private_key: str = Field(default="", description="Wallet private key (hex)")
-
     # API endpoints
-    standx_api_base: str = Field(default="https://api.standx.io")
-    standx_ws_url: str = Field(default="wss://ws.standx.io")
+    standx_api_base: str = Field(default="https://api.standx.com")
+    standx_ws_url: str = Field(default="wss://ws.standx.com")
 
     # Trading parameters
     symbol: str = Field(default="ETH-PERP")
