@@ -18,7 +18,7 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ onAuthenticated }: LoginPageProps) {
-    const { address, isConnecting, error: walletError, hasMetaMask, connect, signMessage } = useWallet();
+    const { address, isConnecting, error: walletError, hasMetaMask, connect } = useWallet();
     const [isAuthenticating, setIsAuthenticating] = useState(false);
     const [authError, setAuthError] = useState<string | null>(null);
 
@@ -32,8 +32,8 @@ export default function LoginPage({ onAuthenticated }: LoginPageProps) {
             // Create StandX auth instance (generates ed25519 key pair)
             const auth = new StandXAuth();
 
-            // Authenticate: prepare-signin → MetaMask sign → login
-            const loginResponse = await auth.authenticate('bsc', address, signMessage);
+            // Authenticate: prepare-signin → ethers.js signs via MetaMask → login
+            const loginResponse = await auth.authenticate('bsc', address);
 
             // Send token + ed25519 key to backend
             const res = await fetch('http://localhost:8000/api/auth/start', {

@@ -1,19 +1,19 @@
 /**
  * StandX Authentication Module
  *
- * Implements the full StandX Perps auth flow:
+ * Implements the full StandX Perps auth flow (per docs):
  * 1. Generate temporary ed25519 key pair (for request body signing)
  * 2. POST /v1/offchain/prepare-signin → get signedData JWT
- * 3. Parse signedData → extract message to sign
- * 4. Sign message with MetaMask (EVM wallet)
+ * 3. Parse signedData → extract SIWE message
+ * 4. Sign SIWE message with wallet (via ethers.js BrowserProvider)
  * 5. POST /v1/offchain/login → get access token
  *
- * The ed25519 key pair is stored in memory for signing subsequent
- * API request bodies per StandX's body signature flow.
+ * Uses ethers.js for wallet signing to match StandX's reference implementation.
  */
 
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { base58 } from '@scure/base';
+import { BrowserProvider } from 'ethers';
 
 const STANDX_AUTH_BASE = 'https://api.standx.com';
 
@@ -55,10 +55,6 @@ function parseJwt<T>(token: string): T {
     return JSON.parse(atob(base64));
 }
 
-function generateUUID(): string {
-    return crypto.randomUUID();
-}
-
 export class StandXAuth {
     private ed25519PrivateKey: Uint8Array;
     private ed25519PublicKey: Uint8Array;
@@ -73,24 +69,27 @@ export class StandXAuth {
     }
 
     /**
-     * Full authentication flow:
-     * 1. Prepare sign-in with StandX
-     * 2. Get MetaMask to sign the message
-     * 3. Submit signature to get JWT token
+     * Full authentication flow using ethers.js BrowserProvider for signing.
+     * This matches StandX's reference EVM implementation exactly.
      */
     async authenticate(
         chain: Chain,
         walletAddress: string,
-        signMessage: (msg: string) => Promise<string>,
     ): Promise<LoginResponse> {
+        if (!window.ethereum) {
+            throw new Error('MetaMask not available');
+        }
+
         // Step 1: Get signedData from StandX
         const signedDataJwt = await this.prepareSignIn(chain, walletAddress);
 
-        // Step 2: Parse JWT to get the message
+        // Step 2: Parse JWT to get the SIWE message
         const payload = parseJwt<SignedData>(signedDataJwt);
 
-        // Step 3: Sign with MetaMask
-        const signature = await signMessage(payload.message);
+        // Step 3: Sign with ethers.js BrowserProvider (matches StandX docs exactly)
+        const provider = new BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        const signature = await signer.signMessage(payload.message);
 
         // Step 4: Login with signature
         return this.login(chain, signature, signedDataJwt);
@@ -109,9 +108,14 @@ export class StandXAuth {
             },
         );
 
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`StandX prepare-signin failed: ${errText}`);
+        }
+
         const data = await res.json();
         if (!data.success) {
-            throw new Error('Failed to prepare sign-in with StandX');
+            throw new Error(`StandX prepare-signin rejected: ${JSON.stringify(data)}`);
         }
         return data.signedData;
     }
@@ -141,11 +145,10 @@ export class StandXAuth {
 
     /**
      * Sign a request body per StandX's body signature flow.
-     * Returns headers to attach to the API request.
      */
     signRequest(payload: string): RequestSignatureHeaders {
         const version = 'v1';
-        const requestId = generateUUID();
+        const requestId = crypto.randomUUID();
         const timestamp = Date.now();
         const message = `${version},${requestId},${timestamp},${payload}`;
         const messageBytes = new TextEncoder().encode(message);
@@ -159,18 +162,12 @@ export class StandXAuth {
         };
     }
 
-    /**
-     * Get the ed25519 private key (hex) for backend use.
-     */
     getEd25519PrivateKeyHex(): string {
         return Array.from(this.ed25519PrivateKey)
             .map((b) => b.toString(16).padStart(2, '0'))
             .join('');
     }
 
-    /**
-     * Get the requestId (base58-encoded ed25519 public key).
-     */
     getRequestId(): string {
         return this.requestId;
     }
