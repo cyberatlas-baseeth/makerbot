@@ -10,6 +10,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+venv/
 
 # Node
 node_modules/
@@ -25,6 +26,3 @@ frontend/.vite/
 # OS
 .DS_Store
 Thumbs.db
-
-# Docker
-*.log

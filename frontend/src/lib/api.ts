@@ -1,4 +1,5 @@
-const API_BASE = '/api';
+// Hardcoded localhost — this bot runs locally only
+const API_BASE = 'http://localhost:8000/api';
 
 export async function fetchStatus() {
     const res = await fetch(`${API_BASE}/status`);

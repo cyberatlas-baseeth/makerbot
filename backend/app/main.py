@@ -2,6 +2,7 @@
 FastAPI application entry point.
 
 Initializes all modules and starts the trading engine on startup.
+Runs locally on localhost:8000.
 """
 
 from __future__ import annotations
@@ -44,10 +45,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan: startup and shutdown."""
     log.info("app.starting", symbol=settings.symbol)
 
-    # Startup sequence
     broadcast_task: asyncio.Task[None] | None = None
     try:
-        # 1. Authenticate
+        # 1. Authenticate with StandX
         if settings.private_key and settings.private_key != "your_private_key_here":
             try:
                 await auth_manager.login()
@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         else:
             log.warning("app.no_private_key — running in monitor-only mode")
 
-        # 2. Start market data feed
+        # 2. Start market data WebSocket feed
         await market_data_client.start()
 
         # 3. Wait briefly for initial orderbook data
@@ -68,16 +68,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         if settings.private_key and settings.private_key != "your_private_key_here":
             await trading_engine.start()
         else:
-            log.warning("app.engine_not_started — no private key")
+            log.warning("app.engine_not_started — no private key configured")
 
-        # 5. Start WebSocket broadcast
+        # 5. Start WebSocket broadcast to frontend
         broadcast_task = asyncio.create_task(ws.broadcast_loop())
 
-        log.info("app.started")
+        log.info("app.started", api="http://localhost:8000", docs="http://localhost:8000/docs")
         yield
 
     finally:
-        # Shutdown sequence
         log.info("app.shutting_down")
 
         if broadcast_task and not broadcast_task.done():
@@ -94,15 +93,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 # Create FastAPI app
 app = FastAPI(
     title="StandX Market Maker Bot",
-    description="Production market-making bot for StandX with uptime optimization",
+    description="Local market-making bot for StandX with uptime optimization",
     version="1.0.0",
     lifespan=lifespan,
 )
 
-# CORS for frontend
+# CORS — allow frontend on localhost:5173
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

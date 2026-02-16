@@ -6,7 +6,7 @@ Flow:
 2. Sign the challenge with the wallet private key (eth_account).
 3. Submit signature to receive a JWT access token + refresh token.
 4. Auto-refresh before expiry.
-5. Token stored in-memory only.
+5. Token stored in-memory only — never persisted to disk.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ class AuthManager:
         self._refresh_expiry: float = 0.0
         self._lock = asyncio.Lock()
         self._client = httpx.AsyncClient(
-            base_url=settings.standx_api_url,
+            base_url=settings.standx_api_base,
             timeout=10.0,
         )
         self._account = Account.from_key(settings.private_key) if settings.private_key else None

@@ -84,7 +84,7 @@ class TradingEngine:
         self._last_quote: Quote | None = None
         self._loop_count = 0
         self._client = httpx.AsyncClient(
-            base_url=settings.standx_api_url,
+            base_url=settings.standx_api_base,
             timeout=10.0,
         )
 
@@ -222,7 +222,7 @@ class TradingEngine:
         # 6. Update position from exchange
         await self._sync_position(mid)
 
-        # 7. Update uptime - both sides active?
+        # 7. Update uptime — both sides active?
         open_orders = [o for o in self._active_orders.values() if o.status == "open"]
         has_active_bid = any(o.side == "buy" for o in open_orders)
         has_active_ask = any(o.side == "sell" for o in open_orders)

@@ -6,7 +6,8 @@ import OrdersTable from './OrdersTable';
 import PositionCard from './PositionCard';
 import ConfigPanel from './ConfigPanel';
 
-const WS_URL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`;
+// Hardcoded localhost — this bot runs locally only
+const WS_URL = 'ws://localhost:8000/ws';
 
 export default function Dashboard() {
     const { state, connected } = useWebSocket(WS_URL);
@@ -41,7 +42,7 @@ export default function Dashboard() {
 
             {/* Main Grid */}
             <main className="max-w-[1440px] mx-auto px-6 py-6">
-                {/* Top Row: Status + Pricing + Uptime */}
+                {/* Top Row: Status + Pricing + Position */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
                     <StatusCard
                         status={state.status}
@@ -59,7 +60,7 @@ export default function Dashboard() {
                     <PositionCard risk={state.risk} />
                 </div>
 
-                {/* Uptime Bar - full width */}
+                {/* Uptime Bar — full width */}
                 <div className="mb-5">
                     <UptimeBar uptime={state.uptime} />
                 </div>
@@ -81,7 +82,7 @@ export default function Dashboard() {
             {/* Footer */}
             <footer className="border-t border-border mt-8 py-4">
                 <div className="max-w-[1440px] mx-auto px-6 flex justify-between text-xs text-text-muted">
-                    <span>StandX Market Maker Bot v1.0.0</span>
+                    <span>StandX Market Maker Bot v1.0.0 — Local Only</span>
                     <span className="font-mono">
                         Loop #{state.loop_count} | Refresh: {state.refresh_interval}s
                     </span>
