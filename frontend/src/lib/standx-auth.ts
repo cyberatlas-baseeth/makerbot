@@ -55,6 +55,44 @@ function parseJwt<T>(token: string): T {
     return JSON.parse(atob(base64));
 }
 
+/**
+ * Construct an EIP-4361 (SIWE) message from individual fields.
+ * The format MUST match the ABNF specification exactly.
+ *
+ * Template:
+ *   {domain} wants you to sign in with your Ethereum account:
+ *   {address}
+ *
+ *   {statement}
+ *
+ *   URI: {uri}
+ *   Version: {version}
+ *   Chain ID: {chainId}
+ *   Nonce: {nonce}
+ *   Issued At: {issuedAt}
+ *   Request ID: {requestId}
+ */
+function constructSiweMessage(payload: SignedData): string {
+    const lines: string[] = [
+        `${payload.domain} wants you to sign in with your Ethereum account:`,
+        payload.address,
+        '',                         // blank line separator
+        payload.statement,
+        '',                         // blank line separator
+        `URI: ${payload.uri}`,
+        `Version: ${payload.version}`,
+        `Chain ID: ${payload.chainId}`,
+        `Nonce: ${payload.nonce}`,
+        `Issued At: ${payload.issuedAt}`,
+    ];
+
+    if (payload.requestId) {
+        lines.push(`Request ID: ${payload.requestId}`);
+    }
+
+    return lines.join('\n');
+}
+
 export class StandXAuth {
     private ed25519PrivateKey: Uint8Array;
     private ed25519PublicKey: Uint8Array;
@@ -83,15 +121,33 @@ export class StandXAuth {
         // Step 1: Get signedData from StandX
         const signedDataJwt = await this.prepareSignIn(chain, walletAddress);
 
-        // Step 2: Parse JWT to get the SIWE message
+        // Step 2: Parse JWT to get the SIWE fields
         const payload = parseJwt<SignedData>(signedDataJwt);
+        console.log('[StandX Auth] JWT payload fields:', {
+            domain: payload.domain,
+            address: payload.address,
+            statement: payload.statement,
+            uri: payload.uri,
+            version: payload.version,
+            chainId: payload.chainId,
+            nonce: payload.nonce,
+            issuedAt: payload.issuedAt,
+            requestId: payload.requestId,
+            hasMessageField: !!payload.message,
+        });
 
-        // Step 3: Sign with ethers.js BrowserProvider (matches StandX docs exactly)
+        // Step 3: Build the SIWE message
+        // If the JWT already contains a pre-constructed `message` field, use it.
+        // Otherwise, construct it from the individual fields per EIP-4361.
+        const siweMessage = payload.message || constructSiweMessage(payload);
+        console.log('[StandX Auth] SIWE message to sign:\n', siweMessage);
+
+        // Step 4: Sign with ethers.js BrowserProvider
         const provider = new BrowserProvider(window.ethereum);
         const signer = await provider.getSigner();
-        const signature = await signer.signMessage(payload.message);
+        const signature = await signer.signMessage(siweMessage);
 
-        // Step 4: Login with signature
+        // Step 5: Login with signature
         return this.login(chain, signature, signedDataJwt);
     }
 

@@ -1,6 +1,6 @@
-# StandX Market Maker Bot
+# Market Maker Bot
 
-Local-only market-making bot for StandX with uptime optimization and a real-time web dashboard.
+Local-only market-making bot for perpetual futures with uptime optimization and a real-time web dashboard.
 
 > **This system runs entirely on your local machine. No cloud deployment, no public URLs.**
 
@@ -23,7 +23,7 @@ Local-only market-making bot for StandX with uptime optimization and a real-time
 └──────────────────────┬─────────────────────────┘
                        │
                   ┌────┴────┐
-                  │ StandX  │
+                  │  Perps  │
                   │   API   │
                   └─────────┘
 ```
@@ -94,8 +94,8 @@ All configuration is in `backend/.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `STANDX_API_BASE` | `https://api.standx.io` | StandX REST API base URL |
-| `STANDX_WS_URL` | `wss://ws.standx.io` | StandX WebSocket URL |
+| `API_BASE` | `https://api.example.io` | REST API base URL |
+| `WS_URL` | `wss://ws.example.io` | WebSocket URL |
 | `PRIVATE_KEY` | — | Wallet private key (hex, no 0x prefix) |
 | `SYMBOL` | `ETH-PERP` | Trading pair |
 | `SPREAD_BPS` | `5.0` | Half-spread in basis points (each side) |
