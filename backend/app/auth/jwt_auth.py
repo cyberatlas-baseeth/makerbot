@@ -38,7 +38,12 @@ class AuthManager:
             base_url=settings.standx_api_base,
             timeout=10.0,
         )
-        self._account = Account.from_key(settings.private_key) if settings.private_key else None
+        self._account = None
+        if settings.private_key and settings.private_key != "your_private_key_here":
+            try:
+                self._account = Account.from_key(settings.private_key)
+            except Exception as e:
+                log.warning("auth.invalid_private_key", error=str(e))
         self._refresh_task: asyncio.Task[None] | None = None
 
     @property
