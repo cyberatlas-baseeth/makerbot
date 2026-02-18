@@ -66,7 +66,7 @@ class MarketDataClient:
         old_symbol = self._orderbook.symbol
 
         # Unsubscribe from old symbol
-        if self._ws and not self._ws.closed:
+        if self._ws:
             try:
                 unsub = json.dumps({
                     "unsubscribe": {
@@ -83,7 +83,7 @@ class MarketDataClient:
         await self._orderbook.reset(new_symbol=new_symbol)
 
         # Subscribe to new symbol
-        if self._ws and not self._ws.closed:
+        if self._ws:
             try:
                 sub = json.dumps({
                     "subscribe": {
