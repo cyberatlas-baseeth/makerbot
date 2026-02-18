@@ -25,13 +25,11 @@ export default function SpreadCard({
     const fmtPrice = (n: number | null | undefined) =>
         n != null ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '—';
 
-    // Calculate projected bid/ask from mid + configured spread (even when engine is off)
-    const projectedBid = midPrice ? midPrice * (1 - bidSpreadBps / 10000) : null;
-    const projectedAsk = midPrice ? midPrice * (1 + askSpreadBps / 10000) : null;
-
-    // Use quote prices if available, otherwise projected
-    const displayBid = lastQuote?.bid_price ?? projectedBid;
-    const displayAsk = lastQuote?.ask_price ?? projectedAsk;
+    // Always project bid/ask from mid + configured spread (updates immediately on config change)
+    const effectiveBidSpread = bidSpreadBps || configuredSpreadBps;
+    const effectiveAskSpread = askSpreadBps || configuredSpreadBps;
+    const displayBid = midPrice ? midPrice * (1 - effectiveBidSpread / 10000) : null;
+    const displayAsk = midPrice ? midPrice * (1 + effectiveAskSpread / 10000) : null;
     const displayBidSize = lastQuote?.bid_size ?? null;
     const displayAskSize = lastQuote?.ask_size ?? null;
 

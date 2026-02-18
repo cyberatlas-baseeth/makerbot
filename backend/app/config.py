@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     bid_notional: float = Field(default=500.0)       # Bid order size in USD
     ask_notional: float = Field(default=500.0)       # Ask order size in USD
     order_size: float = Field(default=0.1)           # Legacy fallback
-    refresh_interval: float = Field(default=5.0)
+    refresh_interval: float = Field(default=1.0)       # Engine tick every 1s
 
     # Inventory skew
     skew_factor_bps: float = Field(default=3.0)      # Skew per unit position

@@ -83,4 +83,4 @@ async def broadcast_loop() -> None:
             except Exception as e:
                 log.error("ws.broadcast_error", error=str(e))
 
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(5.0)  # Broadcast every 5 seconds

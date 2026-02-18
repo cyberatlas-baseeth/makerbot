@@ -56,10 +56,3 @@ export async function updateConfig(config: {
     }
     return res.json();
 }
-
-export async function killBot() {
-    const res = await fetch(`${API_BASE}/kill`, {
-        method: 'POST',
-    });
-    return res.json();
-}

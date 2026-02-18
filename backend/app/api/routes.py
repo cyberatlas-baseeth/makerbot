@@ -227,16 +227,3 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
             "auto_close_fills": settings.auto_close_fills,
         },
     }
-
-
-# --- Kill Switch ---
-
-@router.post("/kill")
-async def kill_bot() -> dict[str, str]:
-    """Emergency kill switch — cancel all orders and stop engine."""
-    if _engine is None:
-        raise HTTPException(status_code=503, detail="Engine not initialized")
-
-    log.warning("api.kill_switch_activated")
-    await _engine.kill()
-    return {"message": "Kill switch activated — all orders cancelled, engine stopped"}

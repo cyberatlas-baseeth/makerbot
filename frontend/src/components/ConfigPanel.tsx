@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { startBot, stopBot, updateConfig, killBot } from '../lib/api';
+import { startBot, stopBot, updateConfig } from '../lib/api';
 
 const SUPPORTED_SYMBOLS = ['BTC-USD', 'ETH-USD', 'XAU-USD', 'XAG-USD'];
 
@@ -29,10 +29,9 @@ export default function ControlPanel({
     const [skewFactor, setSkewFactor] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
-    const [killing, setKilling] = useState(false);
 
     const isRunning = botStatus === 'running';
-    const isStopped = botStatus === 'stopped' || botStatus === 'killed' || botStatus === 'error';
+    const isStopped = botStatus === 'stopped' || botStatus === 'error';
 
     const showMessage = useCallback((msg: string) => {
         setMessage(msg);
@@ -97,19 +96,6 @@ export default function ControlPanel({
         setLoading(false);
     };
 
-    const handleKill = async () => {
-        if (!window.confirm('⚠️ KILL SWITCH: This will cancel ALL orders and stop the bot. Continue?')) {
-            return;
-        }
-        setKilling(true);
-        try {
-            await killBot();
-            showMessage('⚡ Kill switch activated');
-        } catch {
-            showMessage('✗ Kill failed');
-        }
-        setKilling(false);
-    };
 
     return (
         <div className="glass-card animate-fade-in" style={{ animationDelay: '0.05s' }}>
@@ -253,20 +239,6 @@ export default function ControlPanel({
                     {message}
                 </p>
             )}
-
-            {/* Kill Switch */}
-            <div className="pt-3 border-t border-border">
-                <button
-                    onClick={handleKill}
-                    disabled={killing || botStatus === 'killed'}
-                    className="kill-button w-full disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                    {killing ? 'KILLING...' : botStatus === 'killed' ? 'BOT KILLED' : '⚡ KILL SWITCH'}
-                </button>
-                <p className="text-text-muted text-xs text-center mt-2">
-                    Emergency: cancels all orders and stops engine
-                </p>
-            </div>
         </div>
     );
 }
