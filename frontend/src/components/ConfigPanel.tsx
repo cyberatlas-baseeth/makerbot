@@ -9,6 +9,7 @@ interface ControlPanelProps {
     currentBidNotional: number;
     currentAskNotional: number;
     currentSkewFactor: number;
+    currentRequoteUsd: number;
     botStatus: string;
     autoCloseFills: boolean;
 }
@@ -19,6 +20,7 @@ export default function ControlPanel({
     currentBidNotional,
     currentAskNotional,
     currentSkewFactor,
+    currentRequoteUsd,
     botStatus,
     autoCloseFills,
 }: ControlPanelProps) {
@@ -27,6 +29,7 @@ export default function ControlPanel({
     const [bidNotional, setBidNotional] = useState('');
     const [askNotional, setAskNotional] = useState('');
     const [skewFactor, setSkewFactor] = useState('');
+    const [requoteUsd, setRequoteUsd] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
 
@@ -76,6 +79,7 @@ export default function ControlPanel({
             if (bidNotional) config.bid_notional = parseFloat(bidNotional);
             if (askNotional) config.ask_notional = parseFloat(askNotional);
             if (skewFactor) config.skew_factor_bps = parseFloat(skewFactor);
+            if (requoteUsd) config.requote_threshold_usd = parseFloat(requoteUsd);
 
             if (Object.keys(config).length === 0) {
                 showMessage('No changes to apply');
@@ -89,6 +93,7 @@ export default function ControlPanel({
             setBidNotional('');
             setAskNotional('');
             setSkewFactor('');
+            setRequoteUsd('');
             if (config.symbol) setSelectedSymbol('');
         } catch (err: any) {
             showMessage(`✗ ${err.message || 'Failed to update'}`);
@@ -120,8 +125,8 @@ export default function ControlPanel({
                 </select>
             </div>
 
-            {/* Spread & Skew */}
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            {/* Spread, Skew & Requote */}
+            <div className="grid grid-cols-3 gap-3 mb-3">
                 <div>
                     <label className="text-text-muted text-xs block mb-1.5">
                         Spread (bps): <span className="text-text-secondary">{currentSpreadBps}</span>
@@ -139,7 +144,7 @@ export default function ControlPanel({
                 </div>
                 <div>
                     <label className="text-text-muted text-xs block mb-1.5">
-                        Skew Factor (bps): <span className="text-text-secondary">{currentSkewFactor}</span>
+                        Skew (bps): <span className="text-text-secondary">{currentSkewFactor}</span>
                     </label>
                     <input
                         type="number"
@@ -149,6 +154,21 @@ export default function ControlPanel({
                         placeholder={currentSkewFactor.toString()}
                         value={skewFactor}
                         onChange={(e) => setSkewFactor(e.target.value)}
+                        disabled={loading}
+                    />
+                </div>
+                <div>
+                    <label className="text-text-muted text-xs block mb-1.5">
+                        Requote ($): <span className="text-text-secondary">{currentRequoteUsd}</span>
+                    </label>
+                    <input
+                        type="number"
+                        step="1"
+                        min="1"
+                        className="config-input"
+                        placeholder={currentRequoteUsd.toString()}
+                        value={requoteUsd}
+                        onChange={(e) => setRequoteUsd(e.target.value)}
                         disabled={loading}
                     />
                 </div>

@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     skew_factor_bps: float = Field(default=3.0)      # Skew per unit position
 
     # Persistent order management
-    requote_threshold_bps: float = Field(default=2.0)   # Min drift before replacing
+    requote_threshold_usd: float = Field(default=5.0)    # Refresh orders when mid moves ±$X
     proximity_guard_bps: float = Field(default=1.0)     # Auto-refresh when this close to being hit
 
     # Auto-close fills
@@ -80,6 +80,7 @@ def update_runtime_settings(
     bid_notional: float | None = None,
     ask_notional: float | None = None,
     skew_factor_bps: float | None = None,
+    requote_threshold_usd: float | None = None,
     order_size: float | None = None,
     refresh_interval: float | None = None,
     auto_close_fills: bool | None = None,
@@ -105,6 +106,9 @@ def update_runtime_settings(
     if skew_factor_bps is not None:
         settings.skew_factor_bps = skew_factor_bps
         updates["skew_factor_bps"] = skew_factor_bps
+    if requote_threshold_usd is not None:
+        settings.requote_threshold_usd = requote_threshold_usd
+        updates["requote_threshold_usd"] = requote_threshold_usd
     if order_size is not None:
         settings.order_size = order_size
         updates["order_size"] = order_size

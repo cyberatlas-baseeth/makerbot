@@ -58,6 +58,7 @@ class ConfigUpdate(BaseModel):
     bid_notional: Optional[float] = None
     ask_notional: Optional[float] = None
     skew_factor_bps: Optional[float] = None
+    requote_threshold_usd: Optional[float] = None
     order_size: Optional[float] = None
     refresh_interval: Optional[float] = None
     auto_close_fills: Optional[bool] = None
@@ -186,6 +187,7 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
                 bid_notional=config.bid_notional,
                 ask_notional=config.ask_notional,
                 skew_factor_bps=config.skew_factor_bps,
+                requote_threshold_usd=config.requote_threshold_usd,
                 order_size=config.order_size,
                 refresh_interval=config.refresh_interval,
                 auto_close_fills=config.auto_close_fills,
@@ -205,6 +207,7 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
                 bid_notional=config.bid_notional,
                 ask_notional=config.ask_notional,
                 skew_factor_bps=config.skew_factor_bps,
+                requote_threshold_usd=config.requote_threshold_usd,
                 order_size=config.order_size,
                 refresh_interval=config.refresh_interval,
                 auto_close_fills=config.auto_close_fills,
@@ -222,6 +225,7 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
             "bid_notional": settings.bid_notional,
             "ask_notional": settings.ask_notional,
             "skew_factor_bps": settings.skew_factor_bps,
+            "requote_threshold_usd": settings.requote_threshold_usd,
             "order_size": settings.order_size,
             "refresh_interval": settings.refresh_interval,
             "auto_close_fills": settings.auto_close_fills,

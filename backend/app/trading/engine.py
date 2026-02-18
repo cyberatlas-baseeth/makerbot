@@ -164,6 +164,7 @@ class TradingEngine:
             "ask_notional": settings.ask_notional,
             "order_size": settings.order_size,
             "skew_factor_bps": settings.skew_factor_bps,
+            "requote_threshold_usd": settings.requote_threshold_usd,
             "skew_bps": quote_dict.get("skew_bps", 0.0),
             "bid_spread_bps": quote_dict.get("bid_spread_bps", 0.0),
             "ask_spread_bps": quote_dict.get("ask_spread_bps", 0.0),
@@ -255,13 +256,14 @@ class TradingEngine:
             proximity_hit = (best_bid is not None and
                              order.price >= best_bid - (mid * settings.proximity_guard_bps / 10000.0))
             drift = order.drift_from_target(quote.bid_price, mid)
+            drift_usd = abs(order.price - quote.bid_price)
 
             if proximity_hit:
                 log.info("engine.proximity_guard_bid", order_id=oid,
                          order_price=order.price, best_bid=best_bid)
                 await self._cancel_order(oid)
-            elif drift > settings.requote_threshold_bps:
-                log.info("engine.requote_bid", order_id=oid, drift_bps=round(drift, 2))
+            elif drift_usd >= settings.requote_threshold_usd:
+                log.info("engine.requote_bid", order_id=oid, drift_usd=round(drift_usd, 2))
                 await self._cancel_order(oid)
             elif order.is_stale(settings.stale_order_seconds):
                 log.info("engine.cancel_stale_bid", order_id=oid)
@@ -275,13 +277,14 @@ class TradingEngine:
             proximity_hit = (best_ask is not None and
                              order.price <= best_ask + (mid * settings.proximity_guard_bps / 10000.0))
             drift = order.drift_from_target(quote.ask_price, mid)
+            drift_usd = abs(order.price - quote.ask_price)
 
             if proximity_hit:
                 log.info("engine.proximity_guard_ask", order_id=oid,
                          order_price=order.price, best_ask=best_ask)
                 await self._cancel_order(oid)
-            elif drift > settings.requote_threshold_bps:
-                log.info("engine.requote_ask", order_id=oid, drift_bps=round(drift, 2))
+            elif drift_usd >= settings.requote_threshold_usd:
+                log.info("engine.requote_ask", order_id=oid, drift_usd=round(drift_usd, 2))
                 await self._cancel_order(oid)
             elif order.is_stale(settings.stale_order_seconds):
                 log.info("engine.cancel_stale_ask", order_id=oid)

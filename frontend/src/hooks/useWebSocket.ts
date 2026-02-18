@@ -12,6 +12,7 @@ export interface BotState {
     ask_notional: number;
     order_size: number;
     skew_factor_bps: number;
+    requote_threshold_usd: number;
     skew_bps: number;
     bid_spread_bps: number;
     ask_spread_bps: number;
@@ -100,6 +101,7 @@ const INITIAL_STATE: BotState = {
     ask_notional: 500,
     order_size: 0,
     skew_factor_bps: 3,
+    requote_threshold_usd: 5,
     skew_bps: 0,
     bid_spread_bps: 0,
     ask_spread_bps: 0,

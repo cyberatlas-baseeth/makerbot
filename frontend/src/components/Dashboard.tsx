@@ -50,6 +50,7 @@ export default function Dashboard() {
                         currentBidNotional={state.bid_notional}
                         currentAskNotional={state.ask_notional}
                         currentSkewFactor={state.skew_factor_bps}
+                        currentRequoteUsd={state.requote_threshold_usd}
                         botStatus={state.status}
                         autoCloseFills={state.auto_close_fills}
                     />
