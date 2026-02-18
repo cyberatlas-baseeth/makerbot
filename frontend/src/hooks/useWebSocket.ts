@@ -8,8 +8,8 @@ export interface BotState {
     best_ask: number | null;
     market_spread_bps: number | null;
     configured_spread_bps: number;
-    order_notional: number;
-    qty_override: number;
+    bid_notional: number;
+    ask_notional: number;
     order_size: number;
     skew_factor_bps: number;
     skew_bps: number;
@@ -96,8 +96,8 @@ const INITIAL_STATE: BotState = {
     best_ask: null,
     market_spread_bps: null,
     configured_spread_bps: 0,
-    order_notional: 500,
-    qty_override: 0,
+    bid_notional: 500,
+    ask_notional: 500,
     order_size: 0,
     skew_factor_bps: 3,
     skew_bps: 0,

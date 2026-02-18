@@ -47,8 +47,8 @@ export default function Dashboard() {
                     <ControlPanel
                         currentSymbol={state.symbol}
                         currentSpreadBps={state.configured_spread_bps}
-                        currentOrderNotional={state.order_notional}
-                        currentQtyOverride={state.qty_override}
+                        currentBidNotional={state.bid_notional}
+                        currentAskNotional={state.ask_notional}
                         currentSkewFactor={state.skew_factor_bps}
                         botStatus={state.status}
                         autoCloseFills={state.auto_close_fills}

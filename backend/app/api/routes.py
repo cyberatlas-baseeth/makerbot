@@ -55,8 +55,8 @@ def set_market_data_client(client: Any) -> None:
 class ConfigUpdate(BaseModel):
     symbol: Optional[str] = None
     spread_bps: Optional[float] = None
-    order_notional: Optional[float] = None
-    qty_override: Optional[float] = None
+    bid_notional: Optional[float] = None
+    ask_notional: Optional[float] = None
     skew_factor_bps: Optional[float] = None
     order_size: Optional[float] = None
     refresh_interval: Optional[float] = None
@@ -183,8 +183,8 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
             updates = update_runtime_settings(
                 symbol=config.symbol,
                 spread_bps=config.spread_bps,
-                order_notional=config.order_notional,
-                qty_override=config.qty_override,
+                bid_notional=config.bid_notional,
+                ask_notional=config.ask_notional,
                 skew_factor_bps=config.skew_factor_bps,
                 order_size=config.order_size,
                 refresh_interval=config.refresh_interval,
@@ -202,8 +202,8 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
             # No symbol change — just update params
             updates = update_runtime_settings(
                 spread_bps=config.spread_bps,
-                order_notional=config.order_notional,
-                qty_override=config.qty_override,
+                bid_notional=config.bid_notional,
+                ask_notional=config.ask_notional,
                 skew_factor_bps=config.skew_factor_bps,
                 order_size=config.order_size,
                 refresh_interval=config.refresh_interval,
@@ -219,8 +219,8 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
         "current_config": {
             "symbol": settings.symbol,
             "spread_bps": settings.spread_bps,
-            "order_notional": settings.order_notional,
-            "qty_override": settings.qty_override,
+            "bid_notional": settings.bid_notional,
+            "ask_notional": settings.ask_notional,
             "skew_factor_bps": settings.skew_factor_bps,
             "order_size": settings.order_size,
             "refresh_interval": settings.refresh_interval,

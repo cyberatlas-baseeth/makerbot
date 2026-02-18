@@ -6,8 +6,8 @@ const SUPPORTED_SYMBOLS = ['BTC-USD', 'ETH-USD', 'XAU-USD', 'XAG-USD'];
 interface ControlPanelProps {
     currentSymbol: string;
     currentSpreadBps: number;
-    currentOrderNotional: number;
-    currentQtyOverride: number;
+    currentBidNotional: number;
+    currentAskNotional: number;
     currentSkewFactor: number;
     botStatus: string;
     autoCloseFills: boolean;
@@ -16,16 +16,16 @@ interface ControlPanelProps {
 export default function ControlPanel({
     currentSymbol,
     currentSpreadBps,
-    currentOrderNotional,
-    currentQtyOverride,
+    currentBidNotional,
+    currentAskNotional,
     currentSkewFactor,
     botStatus,
     autoCloseFills,
 }: ControlPanelProps) {
     const [selectedSymbol, setSelectedSymbol] = useState('');
     const [spreadBps, setSpreadBps] = useState('');
-    const [orderNotional, setOrderNotional] = useState('');
-    const [qtyOverride, setQtyOverride] = useState('');
+    const [bidNotional, setBidNotional] = useState('');
+    const [askNotional, setAskNotional] = useState('');
     const [skewFactor, setSkewFactor] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
@@ -74,11 +74,8 @@ export default function ControlPanel({
                 config.symbol = selectedSymbol;
             }
             if (spreadBps) config.spread_bps = parseFloat(spreadBps);
-            if (orderNotional) config.order_notional = parseFloat(orderNotional);
-            if (qtyOverride !== '') {
-                const val = parseFloat(qtyOverride);
-                if (!isNaN(val)) config.qty_override = val;
-            }
+            if (bidNotional) config.bid_notional = parseFloat(bidNotional);
+            if (askNotional) config.ask_notional = parseFloat(askNotional);
             if (skewFactor) config.skew_factor_bps = parseFloat(skewFactor);
 
             if (Object.keys(config).length === 0) {
@@ -90,8 +87,8 @@ export default function ControlPanel({
             await updateConfig(config);
             showMessage(config.symbol ? `✓ Switched to ${config.symbol}` : '✓ Config updated');
             setSpreadBps('');
-            setOrderNotional('');
-            setQtyOverride('');
+            setBidNotional('');
+            setAskNotional('');
             setSkewFactor('');
             if (config.symbol) setSelectedSymbol('');
         } catch (err: any) {
@@ -171,35 +168,35 @@ export default function ControlPanel({
                 </div>
             </div>
 
-            {/* Notional & Qty Override */}
+            {/* Bid Notional & Ask Notional */}
             <div className="grid grid-cols-2 gap-3 mb-4">
                 <div>
                     <label className="text-text-muted text-xs block mb-1.5">
-                        Notional ($): <span className="text-text-secondary">{currentOrderNotional}</span>
+                        Bid ($): <span className="text-text-secondary">{currentBidNotional}</span>
                     </label>
                     <input
                         type="number"
                         step="50"
                         min="10"
                         className="config-input"
-                        placeholder={currentOrderNotional.toString()}
-                        value={orderNotional}
-                        onChange={(e) => setOrderNotional(e.target.value)}
+                        placeholder={currentBidNotional.toString()}
+                        value={bidNotional}
+                        onChange={(e) => setBidNotional(e.target.value)}
                         disabled={loading}
                     />
                 </div>
                 <div>
                     <label className="text-text-muted text-xs block mb-1.5">
-                        Qty Override: <span className="text-text-secondary">{currentQtyOverride || 'auto'}</span>
+                        Ask ($): <span className="text-text-secondary">{currentAskNotional}</span>
                     </label>
                     <input
                         type="number"
-                        step="0.001"
-                        min="0"
+                        step="50"
+                        min="10"
                         className="config-input"
-                        placeholder={currentQtyOverride ? currentQtyOverride.toString() : 'auto'}
-                        value={qtyOverride}
-                        onChange={(e) => setQtyOverride(e.target.value)}
+                        placeholder={currentAskNotional.toString()}
+                        value={askNotional}
+                        onChange={(e) => setAskNotional(e.target.value)}
                         disabled={loading}
                     />
                 </div>

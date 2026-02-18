@@ -2,7 +2,7 @@
 Configuration loader.
 
 All settings loaded from .env file via Pydantic BaseSettings.
-Runtime-modifiable fields: spread_bps, order_notional, qty_override,
+Runtime-modifiable fields: spread_bps, bid_notional, ask_notional,
 skew_factor_bps, refresh_interval, auto_close_fills.
 """
 
@@ -43,8 +43,8 @@ class Settings(BaseSettings):
     # Trading parameters
     symbol: str = Field(default="BTC-USD")
     spread_bps: float = Field(default=50.0)         # Half-spread each side (test=50, prod=10)
-    order_notional: float = Field(default=500.0)     # Order size in USD
-    qty_override: float = Field(default=0.0)         # 0 = use notional, >0 = fixed qty
+    bid_notional: float = Field(default=500.0)       # Bid order size in USD
+    ask_notional: float = Field(default=500.0)       # Ask order size in USD
     order_size: float = Field(default=0.1)           # Legacy fallback
     refresh_interval: float = Field(default=5.0)
 
@@ -77,8 +77,8 @@ settings = Settings()
 
 def update_runtime_settings(
     spread_bps: float | None = None,
-    order_notional: float | None = None,
-    qty_override: float | None = None,
+    bid_notional: float | None = None,
+    ask_notional: float | None = None,
     skew_factor_bps: float | None = None,
     order_size: float | None = None,
     refresh_interval: float | None = None,
@@ -96,12 +96,12 @@ def update_runtime_settings(
     if spread_bps is not None:
         settings.spread_bps = spread_bps
         updates["spread_bps"] = spread_bps
-    if order_notional is not None:
-        settings.order_notional = order_notional
-        updates["order_notional"] = order_notional
-    if qty_override is not None:
-        settings.qty_override = qty_override
-        updates["qty_override"] = qty_override
+    if bid_notional is not None:
+        settings.bid_notional = bid_notional
+        updates["bid_notional"] = bid_notional
+    if ask_notional is not None:
+        settings.ask_notional = ask_notional
+        updates["ask_notional"] = ask_notional
     if skew_factor_bps is not None:
         settings.skew_factor_bps = skew_factor_bps
         updates["skew_factor_bps"] = skew_factor_bps

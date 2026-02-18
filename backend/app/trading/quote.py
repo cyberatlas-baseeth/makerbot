@@ -6,7 +6,7 @@ Generates asymmetric bid/ask prices:
 - Short position → ask goes wider (discourage more sells)
 - Flat → symmetric spread
 
-Sizing: notional / mid_price, or qty_override if set.
+Sizing: bid_notional / mid for bid, ask_notional / mid for ask.
 """
 
 from __future__ import annotations
@@ -79,8 +79,8 @@ class QuoteGenerator:
         max_position: float | None = None,
         skew_factor_bps: float | None = None,
         spread_bps: float | None = None,
-        order_notional: float | None = None,
-        qty_override: float | None = None,
+        bid_notional: float | None = None,
+        ask_notional: float | None = None,
     ) -> Quote:
         """
         Generate a skewed two-sided quote.
@@ -89,6 +89,10 @@ class QuoteGenerator:
             skew = (position / max_position) * skew_factor
             bid_spread = base_spread + max(0, skew)    -- long → bid wider
             ask_spread = base_spread + max(0, -skew)   -- short → ask wider
+
+        Sizing:
+            bid_size = bid_notional / mid_price
+            ask_size = ask_notional / mid_price
         """
         base_spread = spread_bps if spread_bps is not None else settings.spread_bps
         max_pos = max_position if max_position is not None else settings.max_position
@@ -108,24 +112,24 @@ class QuoteGenerator:
         bid_price = mid_price * (1.0 - bid_spread / 10000.0)
         ask_price = mid_price * (1.0 + ask_spread / 10000.0)
 
-        # Calculate size: qty_override > notional > order_size fallback
-        notional = order_notional if order_notional is not None else settings.order_notional
-        qty_ovr = qty_override if qty_override is not None else settings.qty_override
+        # Calculate sizes from separate notionals
+        b_notional = bid_notional if bid_notional is not None else settings.bid_notional
+        a_notional = ask_notional if ask_notional is not None else settings.ask_notional
 
-        if qty_ovr and qty_ovr > 0:
-            size = qty_ovr
-        elif notional > 0 and mid_price > 0:
-            size = notional / mid_price
+        if mid_price > 0:
+            bid_size = b_notional / mid_price
+            ask_size = a_notional / mid_price
         else:
-            size = settings.order_size
+            bid_size = settings.order_size
+            ask_size = settings.order_size
 
         total_spread = bid_spread + ask_spread
 
         quote = Quote(
             bid_price=bid_price,
-            bid_size=size,
+            bid_size=bid_size,
             ask_price=ask_price,
-            ask_size=size,
+            ask_size=ask_size,
             mid_price=mid_price,
             spread_bps=total_spread,
             bid_spread_bps=bid_spread,
