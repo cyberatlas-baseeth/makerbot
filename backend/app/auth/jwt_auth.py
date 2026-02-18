@@ -1,56 +1,61 @@
 """
-StandX Authentication via frontend wallet signing.
+StandX Authentication — credentials loaded from .env.
 
-Architecture:
-- Frontend connects MetaMask → signs message → gets JWT from StandX
-- Frontend sends JWT + ed25519 private key to backend via POST /api/auth/start
-- Backend stores token in memory and uses it for all StandX API calls
-- Backend generates ed25519 body signatures for each request
-
-The private key never leaves the user's browser/MetaMask.
+The JWT token and ed25519 private key are set in .env.
+The bot authenticates automatically on startup — no MetaMask needed.
+Body signatures use ed25519 for order/cancel requests.
 """
 
 from __future__ import annotations
 
-import asyncio
 import base64
 import time
 import uuid
 from typing import Any
-
-import httpx
 
 from app.config import settings
 from app.logger import get_logger
 
 log = get_logger("auth")
 
-# Lazy import ed25519 — only needed for body signing
-_ed25519 = None
 
-
-def _get_ed25519():
-    global _ed25519
-    if _ed25519 is None:
+def _decode_ed25519_key(key_str: str) -> bytes | None:
+    """Decode ed25519 private key from base58 string."""
+    if not key_str:
+        return None
+    try:
+        from base58 import b58decode  # type: ignore
+        return b58decode(key_str)
+    except ImportError:
+        # Fallback: try raw bytes interpretation
         try:
-            from nacl.signing import SigningKey  # type: ignore
-            _ed25519 = "nacl"
-        except ImportError:
-            _ed25519 = "none"
-    return _ed25519
+            return bytes.fromhex(key_str)
+        except ValueError:
+            log.warning("auth.key_decode_failed", hint="Install base58: pip install base58")
+            return None
 
 
 class AuthManager:
-    """Manages StandX JWT token and request signing."""
+    """Manages StandX JWT token and request signing from .env credentials."""
 
     def __init__(self) -> None:
-        self._access_token: str | None = None
-        self._wallet_address: str | None = None
-        self._chain: str | None = None
-        self._ed25519_private_key_bytes: bytes | None = None
-        self._request_id: str | None = None
-        self._token_set_at: float = 0.0
-        self._lock = asyncio.Lock()
+        self._access_token: str = settings.standx_jwt_token
+        self._wallet_address: str = settings.standx_wallet_address
+        self._chain: str = settings.standx_chain
+        self._ed25519_private_key_bytes: bytes | None = _decode_ed25519_key(
+            settings.standx_ed25519_private_key
+        )
+        self._token_set_at: float = time.time()
+
+        if self._access_token:
+            log.info(
+                "auth.loaded_from_env",
+                address=self._wallet_address,
+                chain=self._chain,
+                has_ed25519=self._ed25519_private_key_bytes is not None,
+            )
+        else:
+            log.warning("auth.no_token", hint="Set STANDX_JWT_TOKEN in .env")
 
     @property
     def wallet_address(self) -> str:
@@ -58,40 +63,16 @@ class AuthManager:
 
     @property
     def is_authenticated(self) -> bool:
-        return self._access_token is not None
-
-    async def set_credentials(
-        self,
-        token: str,
-        address: str,
-        chain: str,
-        ed25519_private_key_hex: str,
-        request_id: str,
-    ) -> None:
-        """Store credentials received from frontend after MetaMask login."""
-        async with self._lock:
-            self._access_token = token
-            self._wallet_address = address
-            self._chain = chain
-            self._ed25519_private_key_bytes = bytes.fromhex(ed25519_private_key_hex)
-            self._request_id = request_id
-            self._token_set_at = time.time()
-
-        log.info(
-            "auth.credentials_set",
-            address=address,
-            chain=chain,
-        )
+        return bool(self._access_token)
 
     async def get_token(self) -> str:
         """Return the current access token."""
-        async with self._lock:
-            if self._access_token is None:
-                raise RuntimeError("Not authenticated — connect wallet via dashboard first.")
-            return self._access_token
+        if not self._access_token:
+            raise RuntimeError("Not authenticated — set STANDX_JWT_TOKEN in .env")
+        return self._access_token
 
     async def get_auth_headers(self) -> dict[str, str]:
-        """Return headers with both Authorization and body signature."""
+        """Return Authorization header."""
         token = await self.get_token()
         return {"Authorization": f"Bearer {token}"}
 

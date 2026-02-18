@@ -2,23 +2,25 @@
 REST API routes for the market maker bot.
 
 Endpoints:
-  POST /auth/start  – Receive JWT token from frontend MetaMask login
+  POST /start       – Start the trading engine
+  POST /stop        – Stop the trading engine
   GET  /status      – Bot status, mid-price, spread
   GET  /orders      – Active orders list
   GET  /uptime      – Uptime stats (current hour + history)
   GET  /positions   – Current position & PnL
-  POST /config      – Update spread_bps, order_size, refresh_interval
+  POST /config      – Update symbol, spread_bps, order_size, refresh_interval
   POST /kill        – Emergency kill-switch
 """
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.config import settings, update_runtime_settings
+from app.config import settings, update_runtime_settings, SUPPORTED_SYMBOLS
 from app.logger import get_logger
 from app.auth.jwt_auth import auth_manager
 
@@ -29,6 +31,8 @@ router = APIRouter()
 # These will be set by main.py after engine initialization
 _engine = None
 _orderbook = None
+_market_data_client = None
+_config_lock = asyncio.Lock()
 
 
 def set_engine(engine: Any) -> None:
@@ -41,50 +45,58 @@ def set_orderbook(orderbook: Any) -> None:
     _orderbook = orderbook
 
 
-# --- Auth Models ---
+def set_market_data_client(client: Any) -> None:
+    global _market_data_client
+    _market_data_client = client
 
-class AuthStartRequest(BaseModel):
-    token: str
-    address: str
-    chain: str = "bsc"
-    ed25519_private_key_hex: str
-    request_id: str
 
+# --- Models ---
 
 class ConfigUpdate(BaseModel):
+    symbol: Optional[str] = None
     spread_bps: Optional[float] = None
     order_size: Optional[float] = None
     refresh_interval: Optional[float] = None
 
 
-# --- Auth Endpoint ---
+# --- Start / Stop ---
 
-@router.post("/auth/start")
-async def auth_start(req: AuthStartRequest) -> dict[str, Any]:
-    """
-    Receive JWT token and ed25519 keys from frontend after MetaMask login.
-    Stores credentials and starts the trading engine if not already running.
-    """
-    await auth_manager.set_credentials(
-        token=req.token,
-        address=req.address,
-        chain=req.chain,
-        ed25519_private_key_hex=req.ed25519_private_key_hex,
-        request_id=req.request_id,
-    )
+@router.post("/start")
+async def start_bot() -> dict[str, Any]:
+    """Start the trading engine."""
+    if _engine is None:
+        raise HTTPException(status_code=503, detail="Engine not initialized")
 
-    # Start engine if it exists and is not running
-    if _engine is not None:
-        from app.trading.engine import BotStatus
-        if _engine.status in (BotStatus.STARTING, BotStatus.PAUSED, BotStatus.KILLED):
-            await _engine.start()
-            log.info("api.engine_started_after_auth")
+    if not auth_manager.is_authenticated:
+        raise HTTPException(status_code=401, detail="Not authenticated — set STANDX_JWT_TOKEN in .env")
 
+    from app.trading.engine import BotStatus
+    if _engine.status == BotStatus.RUNNING:
+        raise HTTPException(status_code=409, detail="Engine already running")
+
+    await _engine.start()
+    log.info("api.engine_started")
     return {
-        "message": "Authenticated successfully",
-        "address": req.address,
-        "chain": req.chain,
-        "engine_started": _engine is not None,
+        "message": "Engine started",
+        "status": _engine.status.value,
+    }
+
+
+@router.post("/stop")
+async def stop_bot() -> dict[str, Any]:
+    """Stop the trading engine and cancel all orders."""
+    if _engine is None:
+        raise HTTPException(status_code=503, detail="Engine not initialized")
+
+    from app.trading.engine import BotStatus
+    if _engine.status == BotStatus.STOPPED:
+        raise HTTPException(status_code=409, detail="Engine already stopped")
+
+    await _engine.stop()
+    log.info("api.engine_stopped")
+    return {
+        "message": "Engine stopped — all orders cancelled",
+        "status": _engine.status.value,
     }
 
 
@@ -98,6 +110,7 @@ async def get_status() -> dict[str, Any]:
     status = _engine.get_full_status()
     status["authenticated"] = auth_manager.is_authenticated
     status["wallet_address"] = auth_manager.wallet_address
+    status["supported_symbols"] = SUPPORTED_SYMBOLS
     return status
 
 
@@ -126,28 +139,81 @@ async def get_positions() -> dict[str, Any]:
     return risk_manager.get_status()
 
 
+# --- Config ---
+
 @router.post("/config")
 async def update_config(config: ConfigUpdate) -> dict[str, Any]:
-    """Update runtime configuration."""
-    updates = update_runtime_settings(
-        spread_bps=config.spread_bps,
-        order_size=config.order_size,
-        refresh_interval=config.refresh_interval,
-    )
-    if not updates:
-        raise HTTPException(status_code=400, detail="No valid fields to update")
+    """
+    Update runtime configuration.
 
-    log.info("api.config_updated", updates=updates)
+    If symbol changes: stop engine → cancel orders → reset uptime → switch WS → restart.
+    If only spread/size changes: update immediately.
+    """
+    async with _config_lock:
+        symbol_changed = config.symbol is not None and config.symbol != settings.symbol
+
+        if symbol_changed:
+            # Validate symbol
+            if config.symbol not in SUPPORTED_SYMBOLS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported symbol: {config.symbol}. Must be one of {SUPPORTED_SYMBOLS}",
+                )
+
+            from app.trading.engine import BotStatus
+            was_running = _engine is not None and _engine.status == BotStatus.RUNNING
+
+            # 1. Stop engine if running
+            if was_running and _engine is not None:
+                await _engine.stop()
+
+            # 2. Reset uptime
+            from app.uptime.tracker import uptime_tracker
+            uptime_tracker.reset()
+
+            # 3. Switch WS subscription
+            if _market_data_client is not None:
+                await _market_data_client.switch_symbol(config.symbol)
+
+            # 4. Update config
+            updates = update_runtime_settings(
+                symbol=config.symbol,
+                spread_bps=config.spread_bps,
+                order_size=config.order_size,
+                refresh_interval=config.refresh_interval,
+            )
+
+            # 5. Restart engine if it was running
+            if was_running and _engine is not None:
+                await asyncio.sleep(1.0)  # Brief pause for new orderbook data
+                await _engine.start()
+
+            log.info("api.symbol_switched", updates=updates)
+
+        else:
+            # No symbol change — just update spread/size
+            updates = update_runtime_settings(
+                spread_bps=config.spread_bps,
+                order_size=config.order_size,
+                refresh_interval=config.refresh_interval,
+            )
+            if not updates:
+                raise HTTPException(status_code=400, detail="No valid fields to update")
+            log.info("api.config_updated", updates=updates)
+
     return {
-        "message": "Configuration updated",
+        "message": "Configuration updated" + (" (symbol switched)" if symbol_changed else ""),
         "updated_fields": updates,
         "current_config": {
+            "symbol": settings.symbol,
             "spread_bps": settings.spread_bps,
             "order_size": settings.order_size,
             "refresh_interval": settings.refresh_interval,
         },
     }
 
+
+# --- Kill Switch ---
 
 @router.post("/kill")
 async def kill_bot() -> dict[str, str]:

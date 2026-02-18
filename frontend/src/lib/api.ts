@@ -1,6 +1,24 @@
 // Hardcoded localhost — this bot runs locally only
 const API_BASE = 'http://localhost:8000/api';
 
+export async function startBot() {
+    const res = await fetch(`${API_BASE}/start`, { method: 'POST' });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Request failed' }));
+        throw new Error(err.detail || 'Failed to start');
+    }
+    return res.json();
+}
+
+export async function stopBot() {
+    const res = await fetch(`${API_BASE}/stop`, { method: 'POST' });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Request failed' }));
+        throw new Error(err.detail || 'Failed to stop');
+    }
+    return res.json();
+}
+
 export async function fetchStatus() {
     const res = await fetch(`${API_BASE}/status`);
     return res.json();
@@ -22,6 +40,7 @@ export async function fetchPositions() {
 }
 
 export async function updateConfig(config: {
+    symbol?: string;
     spread_bps?: number;
     order_size?: number;
     refresh_interval?: number;
@@ -31,6 +50,10 @@ export async function updateConfig(config: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
     });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Request failed' }));
+        throw new Error(err.detail || 'Failed to update config');
+    }
     return res.json();
 }
 

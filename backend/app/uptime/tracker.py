@@ -72,6 +72,18 @@ class UptimeTracker:
         self._last_tick: float = time.time()
         self._is_active = False
 
+    def reset(self) -> None:
+        """Reset all uptime data. Used on symbol switch."""
+        self._current_hour = self._get_current_hour()
+        self._current_record = HourlyRecord(
+            hour_start=self._current_hour,
+            target_seconds=self._target_seconds,
+        )
+        self._history.clear()
+        self._last_tick = time.time()
+        self._is_active = False
+        log.info("uptime.reset")
+
     @staticmethod
     def _get_current_hour() -> float:
         """Return the timestamp of the start of the current hour."""

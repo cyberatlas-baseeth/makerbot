@@ -16,6 +16,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _CONFIG_DIR = Path(__file__).resolve().parent.parent
 
+# Supported trading pairs
+SUPPORTED_SYMBOLS = ["BTC-USD", "ETH-USD", "XAU-USD", "XAG-USD"]
+
 
 class Settings(BaseSettings):
     """Application settings loaded entirely from .env file."""
@@ -27,11 +30,17 @@ class Settings(BaseSettings):
     )
 
     # API endpoints
-    standx_api_base: str = Field(default="https://api.standx.com")
-    standx_ws_url: str = Field(default="wss://ws.standx.com")
+    standx_api_base: str = Field(default="https://perps.standx.com")
+    standx_ws_url: str = Field(default="wss://perps.standx.com/ws-stream/v1")
+
+    # StandX credentials (loaded from .env)
+    standx_jwt_token: str = Field(default="")
+    standx_ed25519_private_key: str = Field(default="")
+    standx_wallet_address: str = Field(default="")
+    standx_chain: str = Field(default="bsc")
 
     # Trading parameters
-    symbol: str = Field(default="ETH-PERP")
+    symbol: str = Field(default="BTC-USD")
     spread_bps: float = Field(default=5.0)
     order_size: float = Field(default=0.1)
     refresh_interval: float = Field(default=5.0)
@@ -57,10 +66,16 @@ def update_runtime_settings(
     spread_bps: float | None = None,
     order_size: float | None = None,
     refresh_interval: float | None = None,
+    symbol: str | None = None,
 ) -> dict[str, Any]:
     """Update runtime-modifiable settings. Returns updated values."""
     global settings
     updates: dict[str, Any] = {}
+    if symbol is not None:
+        if symbol not in SUPPORTED_SYMBOLS:
+            raise ValueError(f"Unsupported symbol: {symbol}. Must be one of {SUPPORTED_SYMBOLS}")
+        settings.symbol = symbol
+        updates["symbol"] = symbol
     if spread_bps is not None:
         settings.spread_bps = spread_bps
         updates["spread_bps"] = spread_bps

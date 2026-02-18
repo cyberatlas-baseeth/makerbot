@@ -40,6 +40,16 @@ class Orderbook:
         self._lock = asyncio.Lock()
         self._last_update: float = 0.0
 
+    async def reset(self, new_symbol: str | None = None) -> None:
+        """Clear all orderbook data. Optionally switch to a new symbol."""
+        async with self._lock:
+            self._bids.clear()
+            self._asks.clear()
+            self._last_update = 0.0
+            if new_symbol:
+                self.symbol = new_symbol
+        log.info("orderbook.reset", symbol=self.symbol)
+
     async def update_snapshot(self, bids: list[list[float]], asks: list[list[float]]) -> None:
         """Replace the entire orderbook with a snapshot."""
         async with self._lock:

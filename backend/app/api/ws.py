@@ -2,6 +2,7 @@
 WebSocket broadcast endpoint for real-time frontend updates.
 
 Broadcasts engine state snapshot to all connected clients every second.
+Includes orderbook data (best bid/ask) in the payload.
 """
 
 from __future__ import annotations
@@ -21,13 +22,19 @@ router = APIRouter()
 # Connected frontend clients
 _clients: set[WebSocket] = set()
 
-# Reference to engine (set from main.py)
+# References (set from main.py)
 _engine = None
+_orderbook = None
 
 
 def set_engine(engine: Any) -> None:
     global _engine
     _engine = engine
+
+
+def set_orderbook(orderbook: Any) -> None:
+    global _orderbook
+    _orderbook = orderbook
 
 
 @router.websocket("/ws")

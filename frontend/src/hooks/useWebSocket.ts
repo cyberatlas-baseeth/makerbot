@@ -4,6 +4,8 @@ export interface BotState {
     status: string;
     symbol: string;
     mid_price: number | null;
+    best_bid: number | null;
+    best_ask: number | null;
     market_spread_bps: number | null;
     configured_spread_bps: number;
     order_size: number;
@@ -14,6 +16,7 @@ export interface BotState {
     loop_count: number;
     consecutive_failures: number;
     uptime: UptimeStats;
+    uptime_percentage: number;
     risk: RiskStatus;
 }
 
@@ -75,9 +78,11 @@ export interface RiskStatus {
 }
 
 const INITIAL_STATE: BotState = {
-    status: 'starting',
+    status: 'stopped',
     symbol: '-',
     mid_price: null,
+    best_bid: null,
+    best_ask: null,
     market_spread_bps: null,
     configured_spread_bps: 0,
     order_size: 0,
@@ -102,6 +107,7 @@ const INITIAL_STATE: BotState = {
         hours_target_met_last_24h: 0,
         avg_uptime_pct_last_24h: 0,
     },
+    uptime_percentage: 0,
     risk: {
         position: {
             size: 0,

@@ -1,8 +1,8 @@
 """
 FastAPI application entry point.
 
-Initializes all modules. Trading engine starts AFTER frontend sends
-the JWT token via POST /api/auth/start (MetaMask sign-in flow).
+Initializes all modules. Credentials loaded from .env (no MetaMask).
+Trading engine starts via POST /api/start from the dashboard.
 Runs locally on localhost:8000.
 """
 
@@ -29,35 +29,39 @@ log = get_logger("main")
 
 # Core instances
 orderbook = Orderbook(symbol=settings.symbol)
-market_data_client = MarketDataClient(
-    orderbook=orderbook,
-    auth_headers_fn=auth_manager.get_auth_headers,
-)
+market_data_client = MarketDataClient(orderbook=orderbook)
 trading_engine = TradingEngine(orderbook=orderbook)
 
 # Wire up API references
 routes.set_engine(trading_engine)
 routes.set_orderbook(orderbook)
+routes.set_market_data_client(market_data_client)
 ws.set_engine(trading_engine)
+ws.set_orderbook(orderbook)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan: startup and shutdown."""
-    log.info("app.starting", symbol=settings.symbol)
+    log.info(
+        "app.starting",
+        symbol=settings.symbol,
+        authenticated=auth_manager.is_authenticated,
+        wallet=auth_manager.wallet_address,
+    )
 
     broadcast_task: asyncio.Task[None] | None = None
     try:
-        # Start market data WebSocket feed (public, no auth needed)
+        # Start market data WebSocket feed
         await market_data_client.start()
 
         # Wait briefly for initial orderbook data
         await asyncio.sleep(2.0)
 
-        # Engine will be started by POST /api/auth/start after MetaMask login
+        # Engine starts via POST /api/start from dashboard
         log.info(
-            "app.waiting_for_auth",
-            message="Connect wallet via dashboard to start trading engine",
+            "app.ready",
+            message="Click Start in the dashboard to begin trading",
         )
 
         # Start WebSocket broadcast to frontend
@@ -82,9 +86,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 # Create FastAPI app
 app = FastAPI(
-    title="StandX Market Maker Bot",
-    description="Local market-making bot for StandX with uptime optimization",
-    version="1.0.0",
+    title="Market Maker Bot",
+    description="Local market-making bot with uptime optimization",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -108,8 +112,8 @@ app.include_router(ws.router)
 @app.get("/")
 async def root() -> dict[str, str]:
     return {
-        "service": "StandX Market Maker Bot",
-        "version": "1.0.0",
+        "service": "Market Maker Bot",
+        "version": "2.0.0",
         "docs": "/docs",
     }
 

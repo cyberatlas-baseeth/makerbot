@@ -37,7 +37,7 @@ log = get_logger("engine")
 class BotStatus(str, Enum):
     STARTING = "starting"
     RUNNING = "running"
-    PAUSED = "paused"
+    STOPPED = "stopped"
     ERROR = "error"
     KILLED = "killed"
 
@@ -77,12 +77,13 @@ class TradingEngine:
 
     def __init__(self, orderbook: Orderbook) -> None:
         self._orderbook = orderbook
-        self._status = BotStatus.STARTING
+        self._status = BotStatus.STOPPED
         self._active_orders: dict[str, ActiveOrder] = {}
         self._consecutive_failures = 0
         self._task: asyncio.Task[None] | None = None
         self._last_quote: Quote | None = None
         self._loop_count = 0
+        self._lock = asyncio.Lock()
         # Trading API uses perps.standx.com (not api.standx.com)
         self._client = httpx.AsyncClient(
             base_url="https://perps.standx.com",
@@ -103,20 +104,30 @@ class TradingEngine:
 
     async def start(self) -> None:
         """Start the trading engine loop."""
-        self._status = BotStatus.RUNNING
-        self._task = asyncio.create_task(self._main_loop())
-        log.info("engine.started")
+        async with self._lock:
+            if self._status == BotStatus.RUNNING:
+                log.warning("engine.already_running")
+                return
+            self._status = BotStatus.RUNNING
+            self._consecutive_failures = 0
+            self._task = asyncio.create_task(self._main_loop())
+            log.info("engine.started")
 
     async def stop(self) -> None:
-        """Gracefully stop the engine."""
-        self._status = BotStatus.PAUSED
-        if self._task and not self._task.done():
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
-        log.info("engine.stopped")
+        """Gracefully stop the engine and cancel all orders."""
+        async with self._lock:
+            if self._status == BotStatus.STOPPED:
+                log.warning("engine.already_stopped")
+                return
+            self._status = BotStatus.STOPPED
+            if self._task and not self._task.done():
+                self._task.cancel()
+                try:
+                    await self._task
+                except asyncio.CancelledError:
+                    pass
+            await self._cancel_all_orders()
+            log.info("engine.stopped")
 
     async def kill(self) -> None:
         """Emergency kill: cancel all orders and stop."""
@@ -133,10 +144,13 @@ class TradingEngine:
 
     def get_full_status(self) -> dict[str, Any]:
         """Return comprehensive engine status."""
+        uptime_stats = uptime_tracker.get_stats()
         return {
             "status": self._status.value,
             "symbol": settings.symbol,
             "mid_price": self._orderbook.mid_price,
+            "best_bid": self._orderbook.best_bid,
+            "best_ask": self._orderbook.best_ask,
             "market_spread_bps": self._orderbook.spread_bps,
             "configured_spread_bps": settings.spread_bps,
             "order_size": settings.order_size,
@@ -146,7 +160,8 @@ class TradingEngine:
             "last_quote": self.last_quote,
             "loop_count": self._loop_count,
             "consecutive_failures": self._consecutive_failures,
-            "uptime": uptime_tracker.get_stats(),
+            "uptime": uptime_stats,
+            "uptime_percentage": uptime_stats.get("current_hour", {}).get("uptime_pct", 0),
             "risk": risk_manager.get_status(),
         }
 

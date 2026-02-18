@@ -1,6 +1,7 @@
 # .env
 .env
 backend/.env
+standxapi.txt
 
 # Python
 __pycache__/
