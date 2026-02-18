@@ -6,19 +6,27 @@ const SUPPORTED_SYMBOLS = ['BTC-USD', 'ETH-USD', 'XAU-USD', 'XAG-USD'];
 interface ControlPanelProps {
     currentSymbol: string;
     currentSpreadBps: number;
-    currentOrderSize: number;
+    currentOrderNotional: number;
+    currentQtyOverride: number;
+    currentSkewFactor: number;
     botStatus: string;
+    autoCloseFills: boolean;
 }
 
 export default function ControlPanel({
     currentSymbol,
     currentSpreadBps,
-    currentOrderSize,
+    currentOrderNotional,
+    currentQtyOverride,
+    currentSkewFactor,
     botStatus,
+    autoCloseFills,
 }: ControlPanelProps) {
     const [selectedSymbol, setSelectedSymbol] = useState('');
     const [spreadBps, setSpreadBps] = useState('');
-    const [orderSize, setOrderSize] = useState('');
+    const [orderNotional, setOrderNotional] = useState('');
+    const [qtyOverride, setQtyOverride] = useState('');
+    const [skewFactor, setSkewFactor] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [killing, setKilling] = useState(false);
@@ -61,13 +69,17 @@ export default function ControlPanel({
         setMessage('');
         try {
             const config: Record<string, any> = {};
-            const effectiveSymbol = selectedSymbol || currentSymbol;
 
             if (selectedSymbol && selectedSymbol !== currentSymbol) {
                 config.symbol = selectedSymbol;
             }
             if (spreadBps) config.spread_bps = parseFloat(spreadBps);
-            if (orderSize) config.order_size = parseFloat(orderSize);
+            if (orderNotional) config.order_notional = parseFloat(orderNotional);
+            if (qtyOverride !== '') {
+                const val = parseFloat(qtyOverride);
+                if (!isNaN(val)) config.qty_override = val;
+            }
+            if (skewFactor) config.skew_factor_bps = parseFloat(skewFactor);
 
             if (Object.keys(config).length === 0) {
                 showMessage('No changes to apply');
@@ -76,9 +88,11 @@ export default function ControlPanel({
             }
 
             await updateConfig(config);
-            showMessage(config.symbol ? `✓ Switched to ${effectiveSymbol}` : '✓ Config updated');
+            showMessage(config.symbol ? `✓ Switched to ${config.symbol}` : '✓ Config updated');
             setSpreadBps('');
-            setOrderSize('');
+            setOrderNotional('');
+            setQtyOverride('');
+            setSkewFactor('');
             if (config.symbol) setSelectedSymbol('');
         } catch (err: any) {
             showMessage(`✗ ${err.message || 'Failed to update'}`);
@@ -123,16 +137,16 @@ export default function ControlPanel({
                 </select>
             </div>
 
-            {/* Spread & Order Size */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            {/* Spread & Skew */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                     <label className="text-text-muted text-xs block mb-1.5">
                         Spread (bps): <span className="text-text-secondary">{currentSpreadBps}</span>
                     </label>
                     <input
                         type="number"
-                        step="0.1"
-                        min="0.1"
+                        step="0.5"
+                        min="1"
                         className="config-input"
                         placeholder={currentSpreadBps.toString()}
                         value={spreadBps}
@@ -142,19 +156,61 @@ export default function ControlPanel({
                 </div>
                 <div>
                     <label className="text-text-muted text-xs block mb-1.5">
-                        Order Size: <span className="text-text-secondary">{currentOrderSize}</span>
+                        Skew Factor (bps): <span className="text-text-secondary">{currentSkewFactor}</span>
                     </label>
                     <input
                         type="number"
-                        step="0.01"
-                        min="0.01"
+                        step="0.5"
+                        min="0"
                         className="config-input"
-                        placeholder={currentOrderSize.toString()}
-                        value={orderSize}
-                        onChange={(e) => setOrderSize(e.target.value)}
+                        placeholder={currentSkewFactor.toString()}
+                        value={skewFactor}
+                        onChange={(e) => setSkewFactor(e.target.value)}
                         disabled={loading}
                     />
                 </div>
+            </div>
+
+            {/* Notional & Qty Override */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                    <label className="text-text-muted text-xs block mb-1.5">
+                        Notional ($): <span className="text-text-secondary">{currentOrderNotional}</span>
+                    </label>
+                    <input
+                        type="number"
+                        step="50"
+                        min="10"
+                        className="config-input"
+                        placeholder={currentOrderNotional.toString()}
+                        value={orderNotional}
+                        onChange={(e) => setOrderNotional(e.target.value)}
+                        disabled={loading}
+                    />
+                </div>
+                <div>
+                    <label className="text-text-muted text-xs block mb-1.5">
+                        Qty Override: <span className="text-text-secondary">{currentQtyOverride || 'auto'}</span>
+                    </label>
+                    <input
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        className="config-input"
+                        placeholder={currentQtyOverride ? currentQtyOverride.toString() : 'auto'}
+                        value={qtyOverride}
+                        onChange={(e) => setQtyOverride(e.target.value)}
+                        disabled={loading}
+                    />
+                </div>
+            </div>
+
+            {/* Auto-close indicator */}
+            <div className="flex items-center gap-2 mb-4 text-xs">
+                <div className={`w-2 h-2 rounded-full ${autoCloseFills ? 'bg-green-400' : 'bg-red-400'}`} />
+                <span className="text-text-muted">
+                    Auto-close on fill: {autoCloseFills ? 'ON' : 'OFF'}
+                </span>
             </div>
 
             {/* Apply Config */}
@@ -201,7 +257,7 @@ export default function ControlPanel({
                 </p>
             )}
 
-            {/* Kill Switch — collapsed danger zone */}
+            {/* Kill Switch */}
             <div className="pt-3 border-t border-border">
                 <button
                     onClick={handleKill}

@@ -8,7 +8,15 @@ export interface BotState {
     best_ask: number | null;
     market_spread_bps: number | null;
     configured_spread_bps: number;
+    order_notional: number;
+    qty_override: number;
     order_size: number;
+    skew_factor_bps: number;
+    skew_bps: number;
+    bid_spread_bps: number;
+    ask_spread_bps: number;
+    auto_close_fills: boolean;
+    auto_close_count: number;
     refresh_interval: number;
     active_orders: Order[];
     active_order_count: number;
@@ -37,6 +45,9 @@ export interface Quote {
     ask_size: number;
     mid_price: number;
     spread_bps: number;
+    bid_spread_bps: number;
+    ask_spread_bps: number;
+    skew_bps: number;
     bid_deviation_bps: number;
     ask_deviation_bps: number;
     within_limits: boolean;
@@ -85,7 +96,15 @@ const INITIAL_STATE: BotState = {
     best_ask: null,
     market_spread_bps: null,
     configured_spread_bps: 0,
+    order_notional: 500,
+    qty_override: 0,
     order_size: 0,
+    skew_factor_bps: 3,
+    skew_bps: 0,
+    bid_spread_bps: 0,
+    ask_spread_bps: 0,
+    auto_close_fills: true,
+    auto_close_count: 0,
     refresh_interval: 0,
     active_orders: [],
     active_order_count: 0,

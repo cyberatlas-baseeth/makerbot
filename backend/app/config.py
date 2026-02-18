@@ -2,7 +2,8 @@
 Configuration loader.
 
 All settings loaded from .env file via Pydantic BaseSettings.
-Runtime-modifiable fields: spread_bps, order_size, refresh_interval.
+Runtime-modifiable fields: spread_bps, order_notional, qty_override,
+skew_factor_bps, refresh_interval, auto_close_fills.
 """
 
 from __future__ import annotations
@@ -41,9 +42,21 @@ class Settings(BaseSettings):
 
     # Trading parameters
     symbol: str = Field(default="BTC-USD")
-    spread_bps: float = Field(default=5.0)
-    order_size: float = Field(default=0.1)
+    spread_bps: float = Field(default=50.0)         # Half-spread each side (test=50, prod=10)
+    order_notional: float = Field(default=500.0)     # Order size in USD
+    qty_override: float = Field(default=0.0)         # 0 = use notional, >0 = fixed qty
+    order_size: float = Field(default=0.1)           # Legacy fallback
     refresh_interval: float = Field(default=5.0)
+
+    # Inventory skew
+    skew_factor_bps: float = Field(default=3.0)      # Skew per unit position
+
+    # Persistent order management
+    requote_threshold_bps: float = Field(default=2.0)   # Min drift before replacing
+    proximity_guard_bps: float = Field(default=1.0)     # Auto-refresh when this close to being hit
+
+    # Auto-close fills
+    auto_close_fills: bool = Field(default=True)     # Market close if order fills
 
     # Risk limits
     max_notional: float = Field(default=10000.0)
@@ -64,8 +77,12 @@ settings = Settings()
 
 def update_runtime_settings(
     spread_bps: float | None = None,
+    order_notional: float | None = None,
+    qty_override: float | None = None,
+    skew_factor_bps: float | None = None,
     order_size: float | None = None,
     refresh_interval: float | None = None,
+    auto_close_fills: bool | None = None,
     symbol: str | None = None,
 ) -> dict[str, Any]:
     """Update runtime-modifiable settings. Returns updated values."""
@@ -79,10 +96,22 @@ def update_runtime_settings(
     if spread_bps is not None:
         settings.spread_bps = spread_bps
         updates["spread_bps"] = spread_bps
+    if order_notional is not None:
+        settings.order_notional = order_notional
+        updates["order_notional"] = order_notional
+    if qty_override is not None:
+        settings.qty_override = qty_override
+        updates["qty_override"] = qty_override
+    if skew_factor_bps is not None:
+        settings.skew_factor_bps = skew_factor_bps
+        updates["skew_factor_bps"] = skew_factor_bps
     if order_size is not None:
         settings.order_size = order_size
         updates["order_size"] = order_size
     if refresh_interval is not None:
         settings.refresh_interval = refresh_interval
         updates["refresh_interval"] = refresh_interval
+    if auto_close_fills is not None:
+        settings.auto_close_fills = auto_close_fills
+        updates["auto_close_fills"] = auto_close_fills
     return updates

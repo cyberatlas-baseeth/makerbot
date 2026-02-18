@@ -55,8 +55,12 @@ def set_market_data_client(client: Any) -> None:
 class ConfigUpdate(BaseModel):
     symbol: Optional[str] = None
     spread_bps: Optional[float] = None
+    order_notional: Optional[float] = None
+    qty_override: Optional[float] = None
+    skew_factor_bps: Optional[float] = None
     order_size: Optional[float] = None
     refresh_interval: Optional[float] = None
+    auto_close_fills: Optional[bool] = None
 
 
 # --- Start / Stop ---
@@ -179,8 +183,12 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
             updates = update_runtime_settings(
                 symbol=config.symbol,
                 spread_bps=config.spread_bps,
+                order_notional=config.order_notional,
+                qty_override=config.qty_override,
+                skew_factor_bps=config.skew_factor_bps,
                 order_size=config.order_size,
                 refresh_interval=config.refresh_interval,
+                auto_close_fills=config.auto_close_fills,
             )
 
             # 5. Restart engine if it was running
@@ -191,11 +199,15 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
             log.info("api.symbol_switched", updates=updates)
 
         else:
-            # No symbol change — just update spread/size
+            # No symbol change — just update params
             updates = update_runtime_settings(
                 spread_bps=config.spread_bps,
+                order_notional=config.order_notional,
+                qty_override=config.qty_override,
+                skew_factor_bps=config.skew_factor_bps,
                 order_size=config.order_size,
                 refresh_interval=config.refresh_interval,
+                auto_close_fills=config.auto_close_fills,
             )
             if not updates:
                 raise HTTPException(status_code=400, detail="No valid fields to update")
@@ -207,8 +219,12 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
         "current_config": {
             "symbol": settings.symbol,
             "spread_bps": settings.spread_bps,
+            "order_notional": settings.order_notional,
+            "qty_override": settings.qty_override,
+            "skew_factor_bps": settings.skew_factor_bps,
             "order_size": settings.order_size,
             "refresh_interval": settings.refresh_interval,
+            "auto_close_fills": settings.auto_close_fills,
         },
     }
 
