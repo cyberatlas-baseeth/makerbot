@@ -5,14 +5,35 @@ interface SpreadCardProps {
     marketSpreadBps: number | null;
     configuredSpreadBps: number;
     lastQuote: Quote | null;
+    skewBps: number;
+    bidSpreadBps: number;
+    askSpreadBps: number;
 }
 
-export default function SpreadCard({ midPrice, marketSpreadBps, configuredSpreadBps, lastQuote }: SpreadCardProps) {
+export default function SpreadCard({
+    midPrice,
+    marketSpreadBps,
+    configuredSpreadBps,
+    lastQuote,
+    skewBps,
+    bidSpreadBps,
+    askSpreadBps,
+}: SpreadCardProps) {
     const fmt = (n: number | null | undefined, decimals = 2) =>
         n != null ? n.toFixed(decimals) : '—';
 
     const fmtPrice = (n: number | null | undefined) =>
         n != null ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '—';
+
+    // Calculate projected bid/ask from mid + configured spread (even when engine is off)
+    const projectedBid = midPrice ? midPrice * (1 - bidSpreadBps / 10000) : null;
+    const projectedAsk = midPrice ? midPrice * (1 + askSpreadBps / 10000) : null;
+
+    // Use quote prices if available, otherwise projected
+    const displayBid = lastQuote?.bid_price ?? projectedBid;
+    const displayAsk = lastQuote?.ask_price ?? projectedAsk;
+    const displayBidSize = lastQuote?.bid_size ?? null;
+    const displayAskSize = lastQuote?.ask_size ?? null;
 
     return (
         <div className="glass-card animate-fade-in" style={{ animationDelay: '0.05s' }}>
@@ -27,21 +48,39 @@ export default function SpreadCard({ midPrice, marketSpreadBps, configuredSpread
                 </span>
             </div>
 
+            {/* Bid / Ask pricing boxes */}
             <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="rounded-xl bg-[rgba(16,185,129,0.08)] border border-[rgba(16,185,129,0.2)] p-3 text-center">
                     <span className="text-text-muted text-xs block mb-1">Bid</span>
                     <span className="num-green text-lg font-bold font-mono">
-                        ${fmtPrice(lastQuote?.bid_price)}
+                        ${fmtPrice(displayBid)}
+                    </span>
+                    {displayBidSize != null && (
+                        <span className="text-text-muted text-xs block mt-1">
+                            {displayBidSize.toFixed(6)} qty
+                        </span>
+                    )}
+                    <span className="text-text-muted text-xs block mt-0.5">
+                        -{fmt(bidSpreadBps)} bps
                     </span>
                 </div>
                 <div className="rounded-xl bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] p-3 text-center">
                     <span className="text-text-muted text-xs block mb-1">Ask</span>
                     <span className="num-red text-lg font-bold font-mono">
-                        ${fmtPrice(lastQuote?.ask_price)}
+                        ${fmtPrice(displayAsk)}
+                    </span>
+                    {displayAskSize != null && (
+                        <span className="text-text-muted text-xs block mt-1">
+                            {displayAskSize.toFixed(6)} qty
+                        </span>
+                    )}
+                    <span className="text-text-muted text-xs block mt-0.5">
+                        +{fmt(askSpreadBps)} bps
                     </span>
                 </div>
             </div>
 
+            {/* Spread details */}
             <div className="space-y-2">
                 <div className="flex justify-between">
                     <span className="text-text-muted text-xs">Market Spread</span>
@@ -52,8 +91,10 @@ export default function SpreadCard({ midPrice, marketSpreadBps, configuredSpread
                     <span className="font-mono text-sm">{fmt(configuredSpreadBps)} bps</span>
                 </div>
                 <div className="flex justify-between">
-                    <span className="text-text-muted text-xs">Quote Spread</span>
-                    <span className="font-mono text-sm">{fmt(lastQuote?.spread_bps)} bps</span>
+                    <span className="text-text-muted text-xs">Inventory Skew</span>
+                    <span className={`font-mono text-sm font-semibold ${skewBps > 0 ? 'num-red' : skewBps < 0 ? 'num-green' : 'text-text-secondary'}`}>
+                        {skewBps > 0 ? '+' : ''}{fmt(skewBps)} bps
+                    </span>
                 </div>
                 {lastQuote && (
                     <div className="flex justify-between">

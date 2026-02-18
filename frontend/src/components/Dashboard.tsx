@@ -68,6 +68,9 @@ export default function Dashboard() {
                         marketSpreadBps={state.market_spread_bps}
                         configuredSpreadBps={state.configured_spread_bps}
                         lastQuote={state.last_quote}
+                        skewBps={state.skew_bps}
+                        bidSpreadBps={state.bid_spread_bps || state.configured_spread_bps}
+                        askSpreadBps={state.ask_spread_bps || state.configured_spread_bps}
                     />
                 </div>
 
