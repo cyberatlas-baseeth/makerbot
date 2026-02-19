@@ -224,14 +224,15 @@ class TradingEngine:
             uptime_tracker.tick(has_both_sides=False)
             return
 
-        # 3. Manage existing orders — proximity guard + drift check
+        # 3. Check if existing orders need refreshing
         open_bids = {oid: o for oid, o in self._active_orders.items()
                      if o.side == "buy" and o.status == "open"}
         open_asks = {oid: o for oid, o in self._active_orders.items()
                      if o.side == "sell" and o.status == "open"}
 
-        # Handle bid side
-        need_new_bid = True
+        need_refresh = False
+
+        # Check bid side
         for oid, order in open_bids.items():
             proximity_hit = (best_bid is not None and
                              order.price >= best_bid - (mid * settings.proximity_guard_bps / 10000.0))
@@ -240,18 +241,15 @@ class TradingEngine:
             if proximity_hit:
                 log.info("engine.proximity_guard_bid", order_id=oid,
                          order_price=order.price, best_bid=best_bid)
-                await self._cancel_order(oid)
+                need_refresh = True
             elif drift_bps >= settings.requote_threshold_bps:
                 log.info("engine.requote_bid", order_id=oid, drift_bps=round(drift_bps, 2))
-                await self._cancel_order(oid)
+                need_refresh = True
             elif order.is_stale(settings.stale_order_seconds):
                 log.info("engine.cancel_stale_bid", order_id=oid)
-                await self._cancel_order(oid)
-            else:
-                need_new_bid = False  # Existing order is fine, keep it
+                need_refresh = True
 
-        # Handle ask side
-        need_new_ask = True
+        # Check ask side
         for oid, order in open_asks.items():
             proximity_hit = (best_ask is not None and
                              order.price <= best_ask + (mid * settings.proximity_guard_bps / 10000.0))
@@ -260,21 +258,24 @@ class TradingEngine:
             if proximity_hit:
                 log.info("engine.proximity_guard_ask", order_id=oid,
                          order_price=order.price, best_ask=best_ask)
-                await self._cancel_order(oid)
+                need_refresh = True
             elif drift_bps >= settings.requote_threshold_bps:
                 log.info("engine.requote_ask", order_id=oid, drift_bps=round(drift_bps, 2))
-                await self._cancel_order(oid)
+                need_refresh = True
             elif order.is_stale(settings.stale_order_seconds):
                 log.info("engine.cancel_stale_ask", order_id=oid)
-                await self._cancel_order(oid)
-            else:
-                need_new_ask = False  # Existing order is fine, keep it
+                need_refresh = True
 
-        # 4. Place new orders where needed
-        if need_new_bid:
+        # 4. If refresh needed or no orders exist, cancel all and place new
+        has_both_sides = bool(open_bids) and bool(open_asks)
+
+        if need_refresh or not has_both_sides:
+            if open_bids or open_asks:
+                # Cancel all existing orders on exchange
+                await self._cancel_all_orders()
+
+            # Place fresh orders
             await self._place_order("buy", quote.bid_price, quote.bid_size)
-
-        if need_new_ask:
             await self._place_order("sell", quote.ask_price, quote.ask_size)
 
         # 5. Update uptime — both sides active?
