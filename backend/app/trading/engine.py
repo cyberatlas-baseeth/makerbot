@@ -130,6 +130,9 @@ class TradingEngine:
                 except asyncio.CancelledError:
                     pass
             await self._cancel_all_orders()
+            self._last_quote = None
+            self._consecutive_failures = 0
+            self._loop_count = 0
             log.info("engine.stopped")
 
     async def kill(self) -> None:
@@ -160,8 +163,8 @@ class TradingEngine:
             "bid_notional": settings.bid_notional,
             "ask_notional": settings.ask_notional,
             "requote_threshold_bps": settings.requote_threshold_bps,
-            "bid_spread_bps": quote_dict.get("bid_spread_bps", 0.0),
-            "ask_spread_bps": quote_dict.get("ask_spread_bps", 0.0),
+            "bid_spread_bps": quote_dict.get("bid_spread_bps", settings.spread_bps),
+            "ask_spread_bps": quote_dict.get("ask_spread_bps", settings.spread_bps),
             "refresh_interval": settings.refresh_interval,
             "active_orders": self.active_orders,
             "active_order_count": len([o for o in self._active_orders.values() if o.status == "open"]),
