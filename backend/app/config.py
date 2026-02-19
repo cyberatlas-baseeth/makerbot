@@ -43,8 +43,8 @@ class Settings(BaseSettings):
     # Trading parameters
     symbol: str = Field(default="BTC-USD")
     spread_bps: float = Field(default=50.0)         # Half-spread each side (test=50, prod=10)
-    bid_notional: float = Field(default=500.0)       # Bid order size in USD
-    ask_notional: float = Field(default=500.0)       # Ask order size in USD
+    bid_notional: float = Field(default=30.0)        # Bid order size in USD
+    ask_notional: float = Field(default=30.0)        # Ask order size in USD
     order_size: float = Field(default=0.1)           # Legacy fallback
     refresh_interval: float = Field(default=1.0)       # Engine tick every 1s
 
