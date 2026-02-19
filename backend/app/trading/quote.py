@@ -1,10 +1,9 @@
 """
-Quote generator with inventory-based spread skew.
+Quote generator — symmetric spread quoting for maker uptime.
 
-Generates asymmetric bid/ask prices:
-- Long position → bid goes wider (discourage more buys)
-- Short position → ask goes wider (discourage more sells)
-- Flat → symmetric spread
+Generates symmetric bid/ask prices around mid:
+- bid_price = mid * (1 - spread_bps / 10000)
+- ask_price = mid * (1 + spread_bps / 10000)
 
 Sizing: bid_notional / mid for bid, ask_notional / mid for ask.
 """
@@ -21,7 +20,7 @@ log = get_logger("quote")
 
 @dataclass
 class Quote:
-    """A two-sided quote with skew info."""
+    """A two-sided quote."""
     bid_price: float
     bid_size: float
     ask_price: float
@@ -30,7 +29,6 @@ class Quote:
     spread_bps: float        # Total spread (bid + ask)
     bid_spread_bps: float    # Bid-side half-spread
     ask_spread_bps: float    # Ask-side half-spread
-    skew_bps: float          # Current inventory skew
 
     @property
     def bid_deviation_bps(self) -> float:
@@ -62,7 +60,6 @@ class Quote:
             "spread_bps": round(self.spread_bps, 4),
             "bid_spread_bps": round(self.bid_spread_bps, 4),
             "ask_spread_bps": round(self.ask_spread_bps, 4),
-            "skew_bps": round(self.skew_bps, 4),
             "bid_deviation_bps": round(self.bid_deviation_bps, 4),
             "ask_deviation_bps": round(self.ask_deviation_bps, 4),
             "within_limits": self.is_within_max_deviation,
@@ -70,43 +67,27 @@ class Quote:
 
 
 class QuoteGenerator:
-    """Generates two-sided quotes with inventory skew."""
+    """Generates symmetric two-sided quotes for maker uptime."""
 
     def generate(
         self,
         mid_price: float,
-        position_size: float = 0.0,
-        max_position: float | None = None,
-        skew_factor_bps: float | None = None,
         spread_bps: float | None = None,
         bid_notional: float | None = None,
         ask_notional: float | None = None,
     ) -> Quote:
         """
-        Generate a skewed two-sided quote.
-
-        Skew formula:
-            skew = (position / max_position) * skew_factor
-            bid_spread = base_spread + max(0, skew)    -- long → bid wider
-            ask_spread = base_spread + max(0, -skew)   -- short → ask wider
+        Generate a symmetric two-sided quote.
 
         Sizing:
             bid_size = bid_notional / mid_price
             ask_size = ask_notional / mid_price
         """
         base_spread = spread_bps if spread_bps is not None else settings.spread_bps
-        max_pos = max_position if max_position is not None else settings.max_position
-        skew_factor = skew_factor_bps if skew_factor_bps is not None else settings.skew_factor_bps
 
-        # Calculate inventory skew
-        if max_pos > 0 and position_size != 0:
-            skew = (position_size / max_pos) * skew_factor
-        else:
-            skew = 0.0
-
-        # Asymmetric spread
-        bid_spread = base_spread + max(0.0, skew)     # Long → bid goes wider
-        ask_spread = base_spread + max(0.0, -skew)    # Short → ask goes wider
+        # Symmetric spread
+        bid_spread = base_spread
+        ask_spread = base_spread
 
         # Calculate prices
         bid_price = mid_price * (1.0 - bid_spread / 10000.0)
@@ -120,8 +101,8 @@ class QuoteGenerator:
             bid_size = b_notional / mid_price
             ask_size = a_notional / mid_price
         else:
-            bid_size = settings.order_size
-            ask_size = settings.order_size
+            bid_size = 0.0
+            ask_size = 0.0
 
         total_spread = bid_spread + ask_spread
 
@@ -134,7 +115,6 @@ class QuoteGenerator:
             spread_bps=total_spread,
             bid_spread_bps=bid_spread,
             ask_spread_bps=ask_spread,
-            skew_bps=round(skew, 4),
         )
 
         if not quote.is_within_max_deviation:

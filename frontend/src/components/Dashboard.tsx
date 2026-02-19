@@ -3,7 +3,6 @@ import StatusCard from './StatusCard';
 import SpreadCard from './SpreadCard';
 import UptimeBar from './UptimeBar';
 import OrdersTable from './OrdersTable';
-import PositionCard from './PositionCard';
 import ControlPanel from './ConfigPanel';
 
 // Hardcoded localhost — this bot runs locally only
@@ -49,10 +48,8 @@ export default function Dashboard() {
                         currentSpreadBps={state.configured_spread_bps}
                         currentBidNotional={state.bid_notional}
                         currentAskNotional={state.ask_notional}
-                        currentSkewFactor={state.skew_factor_bps}
                         currentRequoteUsd={state.requote_threshold_usd}
                         botStatus={state.status}
-                        autoCloseFills={state.auto_close_fills}
                     />
                     <StatusCard
                         status={state.status}
@@ -69,7 +66,6 @@ export default function Dashboard() {
                         marketSpreadBps={state.market_spread_bps}
                         configuredSpreadBps={state.configured_spread_bps}
                         lastQuote={state.last_quote}
-                        skewBps={state.skew_bps}
                         bidSpreadBps={state.bid_spread_bps || state.configured_spread_bps}
                         askSpreadBps={state.ask_spread_bps || state.configured_spread_bps}
                     />
@@ -80,12 +76,9 @@ export default function Dashboard() {
                     <UptimeBar uptime={state.uptime} />
                 </div>
 
-                {/* Bottom Row: Orders + Position */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                    <div className="lg:col-span-2">
-                        <OrdersTable orders={state.active_orders} />
-                    </div>
-                    <PositionCard risk={state.risk} />
+                {/* Orders — full width */}
+                <div>
+                    <OrdersTable orders={state.active_orders} />
                 </div>
             </main>
 

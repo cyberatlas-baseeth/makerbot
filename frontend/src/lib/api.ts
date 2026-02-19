@@ -34,15 +34,12 @@ export async function fetchUptime() {
     return res.json();
 }
 
-export async function fetchPositions() {
-    const res = await fetch(`${API_BASE}/positions`);
-    return res.json();
-}
-
 export async function updateConfig(config: {
     symbol?: string;
     spread_bps?: number;
-    order_size?: number;
+    bid_notional?: number;
+    ask_notional?: number;
+    requote_threshold_usd?: number;
     refresh_interval?: number;
 }) {
     const res = await fetch(`${API_BASE}/config`, {

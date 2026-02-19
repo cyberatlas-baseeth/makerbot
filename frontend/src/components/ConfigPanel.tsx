@@ -8,10 +8,8 @@ interface ControlPanelProps {
     currentSpreadBps: number;
     currentBidNotional: number;
     currentAskNotional: number;
-    currentSkewFactor: number;
     currentRequoteUsd: number;
     botStatus: string;
-    autoCloseFills: boolean;
 }
 
 export default function ControlPanel({
@@ -19,16 +17,13 @@ export default function ControlPanel({
     currentSpreadBps,
     currentBidNotional,
     currentAskNotional,
-    currentSkewFactor,
     currentRequoteUsd,
     botStatus,
-    autoCloseFills,
 }: ControlPanelProps) {
     const [selectedSymbol, setSelectedSymbol] = useState('');
     const [spreadBps, setSpreadBps] = useState('');
     const [bidNotional, setBidNotional] = useState('');
     const [askNotional, setAskNotional] = useState('');
-    const [skewFactor, setSkewFactor] = useState('');
     const [requoteUsd, setRequoteUsd] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
@@ -78,7 +73,6 @@ export default function ControlPanel({
             if (spreadBps) config.spread_bps = parseFloat(spreadBps);
             if (bidNotional) config.bid_notional = parseFloat(bidNotional);
             if (askNotional) config.ask_notional = parseFloat(askNotional);
-            if (skewFactor) config.skew_factor_bps = parseFloat(skewFactor);
             if (requoteUsd) config.requote_threshold_usd = parseFloat(requoteUsd);
 
             if (Object.keys(config).length === 0) {
@@ -92,7 +86,6 @@ export default function ControlPanel({
             setSpreadBps('');
             setBidNotional('');
             setAskNotional('');
-            setSkewFactor('');
             setRequoteUsd('');
             if (config.symbol) setSelectedSymbol('');
         } catch (err: any) {
@@ -125,8 +118,8 @@ export default function ControlPanel({
                 </select>
             </div>
 
-            {/* Spread, Skew & Requote */}
-            <div className="grid grid-cols-3 gap-3 mb-3">
+            {/* Spread & Requote */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                     <label className="text-text-muted text-xs block mb-1.5">
                         Spread (bps): <span className="text-text-secondary">{currentSpreadBps}</span>
@@ -139,21 +132,6 @@ export default function ControlPanel({
                         placeholder={currentSpreadBps.toString()}
                         value={spreadBps}
                         onChange={(e) => setSpreadBps(e.target.value)}
-                        disabled={loading}
-                    />
-                </div>
-                <div>
-                    <label className="text-text-muted text-xs block mb-1.5">
-                        Skew (bps): <span className="text-text-secondary">{currentSkewFactor}</span>
-                    </label>
-                    <input
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        className="config-input"
-                        placeholder={currentSkewFactor.toString()}
-                        value={skewFactor}
-                        onChange={(e) => setSkewFactor(e.target.value)}
                         disabled={loading}
                     />
                 </div>
@@ -206,14 +184,6 @@ export default function ControlPanel({
                         disabled={loading}
                     />
                 </div>
-            </div>
-
-            {/* Auto-close indicator */}
-            <div className="flex items-center gap-2 mb-4 text-xs">
-                <div className={`w-2 h-2 rounded-full ${autoCloseFills ? 'bg-green-400' : 'bg-red-400'}`} />
-                <span className="text-text-muted">
-                    Auto-close on fill: {autoCloseFills ? 'ON' : 'OFF'}
-                </span>
             </div>
 
             {/* Apply Config */}

@@ -5,7 +5,6 @@ interface SpreadCardProps {
     marketSpreadBps: number | null;
     configuredSpreadBps: number;
     lastQuote: Quote | null;
-    skewBps: number;
     bidSpreadBps: number;
     askSpreadBps: number;
 }
@@ -15,7 +14,6 @@ export default function SpreadCard({
     marketSpreadBps,
     configuredSpreadBps,
     lastQuote,
-    skewBps,
     bidSpreadBps,
     askSpreadBps,
 }: SpreadCardProps) {
@@ -87,12 +85,6 @@ export default function SpreadCard({
                 <div className="flex justify-between">
                     <span className="text-text-muted text-xs">Configured Spread</span>
                     <span className="font-mono text-sm">{fmt(configuredSpreadBps)} bps</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-text-muted text-xs">Inventory Skew</span>
-                    <span className={`font-mono text-sm font-semibold ${skewBps > 0 ? 'num-red' : skewBps < 0 ? 'num-green' : 'text-text-secondary'}`}>
-                        {skewBps > 0 ? '+' : ''}{fmt(skewBps)} bps
-                    </span>
                 </div>
                 {lastQuote && (
                     <div className="flex justify-between">

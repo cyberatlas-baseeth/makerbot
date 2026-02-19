@@ -10,14 +10,9 @@ export interface BotState {
     configured_spread_bps: number;
     bid_notional: number;
     ask_notional: number;
-    order_size: number;
-    skew_factor_bps: number;
     requote_threshold_usd: number;
-    skew_bps: number;
     bid_spread_bps: number;
     ask_spread_bps: number;
-    auto_close_fills: boolean;
-    auto_close_count: number;
     refresh_interval: number;
     active_orders: Order[];
     active_order_count: number;
@@ -26,7 +21,6 @@ export interface BotState {
     consecutive_failures: number;
     uptime: UptimeStats;
     uptime_percentage: number;
-    risk: RiskStatus;
 }
 
 export interface Order {
@@ -48,7 +42,6 @@ export interface Quote {
     spread_bps: number;
     bid_spread_bps: number;
     ask_spread_bps: number;
-    skew_bps: number;
     bid_deviation_bps: number;
     ask_deviation_bps: number;
     within_limits: boolean;
@@ -75,20 +68,6 @@ export interface UptimeStats {
     avg_uptime_pct_last_24h: number;
 }
 
-export interface RiskStatus {
-    position: {
-        size: number;
-        avg_entry: number;
-        notional: number;
-        unrealized_pnl: number;
-        realized_pnl: number;
-    };
-    max_position: number;
-    max_notional: number;
-    position_utilization: number;
-    notional_utilization: number;
-}
-
 const INITIAL_STATE: BotState = {
     status: 'stopped',
     symbol: '-',
@@ -99,14 +78,9 @@ const INITIAL_STATE: BotState = {
     configured_spread_bps: 0,
     bid_notional: 500,
     ask_notional: 500,
-    order_size: 0,
-    skew_factor_bps: 3,
     requote_threshold_usd: 5,
-    skew_bps: 0,
     bid_spread_bps: 0,
     ask_spread_bps: 0,
-    auto_close_fills: true,
-    auto_close_count: 0,
     refresh_interval: 0,
     active_orders: [],
     active_order_count: 0,
@@ -129,19 +103,6 @@ const INITIAL_STATE: BotState = {
         avg_uptime_pct_last_24h: 0,
     },
     uptime_percentage: 0,
-    risk: {
-        position: {
-            size: 0,
-            avg_entry: 0,
-            notional: 0,
-            unrealized_pnl: 0,
-            realized_pnl: 0,
-        },
-        max_position: 0,
-        max_notional: 0,
-        position_utilization: 0,
-        notional_utilization: 0,
-    },
 };
 
 export function useWebSocket(url: string) {

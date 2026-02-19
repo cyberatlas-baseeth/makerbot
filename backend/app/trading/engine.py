@@ -1,19 +1,19 @@
 """
-Core trading engine — persistent maker with inventory skew.
+Core trading engine — persistent maker for uptime optimization.
 
 Main loop:
-1. Sync position from exchange
-2. Auto-close if position exists (accidental fill protection)
-3. Generate skewed quote based on inventory
-4. Proximity guard: refresh orders when within 1bps of being hit
-5. Drift check: replace only when mid moves beyond threshold
-6. Keep orders alive on the book otherwise
+1. Get mid price from orderbook
+2. Generate symmetric quote
+3. Proximity guard: refresh orders when within 1bps of being hit
+4. Drift check: replace only when mid moves beyond threshold
+5. Keep orders alive on the book otherwise
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+import math
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -23,12 +23,11 @@ from typing import Any
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from app.config import settings
+from app.config import settings, QTY_TICKS
 from app.logger import get_logger
 from app.auth.jwt_auth import auth_manager
 from app.market_data.orderbook import Orderbook
 from app.trading.quote import Quote, quote_generator
-from app.trading.risk import risk_manager
 from app.uptime.tracker import uptime_tracker
 
 log = get_logger("engine")
@@ -79,7 +78,7 @@ class ActiveOrder:
 
 
 class TradingEngine:
-    """Core market-making engine with inventory skew and safety guards."""
+    """Core market-making engine for uptime optimization."""
 
     def __init__(self, orderbook: Orderbook) -> None:
         self._orderbook = orderbook
@@ -90,7 +89,6 @@ class TradingEngine:
         self._last_quote: Quote | None = None
         self._loop_count = 0
         self._lock = asyncio.Lock()
-        self._auto_close_count = 0
         self._client = httpx.AsyncClient(
             base_url=settings.standx_api_base,
             timeout=10.0,
@@ -162,14 +160,9 @@ class TradingEngine:
             "configured_spread_bps": settings.spread_bps,
             "bid_notional": settings.bid_notional,
             "ask_notional": settings.ask_notional,
-            "order_size": settings.order_size,
-            "skew_factor_bps": settings.skew_factor_bps,
             "requote_threshold_usd": settings.requote_threshold_usd,
-            "skew_bps": quote_dict.get("skew_bps", 0.0),
             "bid_spread_bps": quote_dict.get("bid_spread_bps", 0.0),
             "ask_spread_bps": quote_dict.get("ask_spread_bps", 0.0),
-            "auto_close_fills": settings.auto_close_fills,
-            "auto_close_count": self._auto_close_count,
             "refresh_interval": settings.refresh_interval,
             "active_orders": self.active_orders,
             "active_order_count": len([o for o in self._active_orders.values() if o.status == "open"]),
@@ -178,7 +171,6 @@ class TradingEngine:
             "consecutive_failures": self._consecutive_failures,
             "uptime": uptime_stats,
             "uptime_percentage": uptime_stats.get("current_hour", {}).get("uptime_pct", 0),
-            "risk": risk_manager.get_status(),
         }
 
     # ─── Main Loop ────────────────────────────────────────────────
@@ -224,19 +216,8 @@ class TradingEngine:
         best_bid = self._orderbook.best_bid
         best_ask = self._orderbook.best_ask
 
-        # 2. Sync position from exchange
-        await self._sync_position(mid)
-
-        # 3. Auto-close if we have a position (accidental fill)
-        if settings.auto_close_fills and abs(risk_manager.position.size) > 0:
-            await self._close_position(mid)
-
-        # 4. Generate skewed quote based on inventory
-        position_size = risk_manager.position.size
-        quote = quote_generator.generate(
-            mid_price=mid,
-            position_size=position_size,
-        )
+        # 2. Generate symmetric quote
+        quote = quote_generator.generate(mid_price=mid)
         self._last_quote = quote
 
         if not quote.is_within_max_deviation:
@@ -244,7 +225,7 @@ class TradingEngine:
             uptime_tracker.tick(has_both_sides=False)
             return
 
-        # 5. Manage existing orders — proximity guard + drift check
+        # 3. Manage existing orders — proximity guard + drift check
         open_bids = {oid: o for oid, o in self._active_orders.items()
                      if o.side == "buy" and o.status == "open"}
         open_asks = {oid: o for oid, o in self._active_orders.items()
@@ -255,7 +236,6 @@ class TradingEngine:
         for oid, order in open_bids.items():
             proximity_hit = (best_bid is not None and
                              order.price >= best_bid - (mid * settings.proximity_guard_bps / 10000.0))
-            drift = order.drift_from_target(quote.bid_price, mid)
             drift_usd = abs(order.price - quote.bid_price)
 
             if proximity_hit:
@@ -276,7 +256,6 @@ class TradingEngine:
         for oid, order in open_asks.items():
             proximity_hit = (best_ask is not None and
                              order.price <= best_ask + (mid * settings.proximity_guard_bps / 10000.0))
-            drift = order.drift_from_target(quote.ask_price, mid)
             drift_usd = abs(order.price - quote.ask_price)
 
             if proximity_hit:
@@ -292,14 +271,14 @@ class TradingEngine:
             else:
                 need_new_ask = False  # Existing order is fine, keep it
 
-        # 6. Place new orders where needed
+        # 4. Place new orders where needed
         if need_new_bid:
             await self._place_order("buy", quote.bid_price, quote.bid_size)
 
         if need_new_ask:
             await self._place_order("sell", quote.ask_price, quote.ask_size)
 
-        # 7. Update uptime — both sides active?
+        # 5. Update uptime — both sides active?
         open_orders = [o for o in self._active_orders.values() if o.status == "open"]
         has_active_bid = any(o.side == "buy" for o in open_orders)
         has_active_ask = any(o.side == "sell" for o in open_orders)
@@ -311,67 +290,26 @@ class TradingEngine:
             mid=round(mid, 4),
             bid=round(quote.bid_price, 4),
             ask=round(quote.ask_price, 4),
-            skew=round(quote.skew_bps, 2),
             bid_spread=round(quote.bid_spread_bps, 2),
             ask_spread=round(quote.ask_spread_bps, 2),
-            position=round(position_size, 6),
             active_orders=len(open_orders),
             uptime_pct=round(uptime_tracker.current_uptime_pct, 2),
         )
-
-    # ─── Auto-Close Position ──────────────────────────────────────
-
-    async def _close_position(self, mid: float) -> None:
-        """Close any open position with a market order (accidental fill protection)."""
-        pos = risk_manager.position.size
-        if abs(pos) < 1e-10:
-            return
-
-        side = "sell" if pos > 0 else "buy"
-        qty = abs(pos)
-
-        log.warning(
-            "engine.auto_close_position",
-            position=pos,
-            side=side,
-            qty=qty,
-        )
-
-        payload = {
-            "symbol": settings.symbol,
-            "side": side,
-            "order_type": "market",
-            "qty": str(round(qty, 8)),
-            "time_in_force": "ioc",
-            "reduce_only": True,
-        }
-        payload_str = json.dumps(payload)
-        headers = await auth_manager.get_full_headers(payload_str)
-        headers["Content-Type"] = "application/json"
-
-        try:
-            resp = await self._client.post(
-                "/api/new_order",
-                content=payload_str,
-                headers=headers,
-            )
-            resp.raise_for_status()
-            self._auto_close_count += 1
-            log.info("engine.position_closed", side=side, qty=qty,
-                     auto_close_count=self._auto_close_count)
-        except Exception as e:
-            log.error("engine.auto_close_failed", error=str(e))
 
     # ─── Order Management ─────────────────────────────────────────
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, max=5))
     async def _place_order(self, side: str, price: float, size: float) -> str | None:
         """Place a limit order on StandX."""
-        # Floor qty to 1 decimal (0.1 tick), minimum 0.1
-        import math
-        floored_qty = math.floor(size * 10) / 10
-        if floored_qty < 0.1:
-            floored_qty = 0.1  # Minimum order size
+        # Round qty to symbol's tick size
+        tick = QTY_TICKS.get(settings.symbol, 0.0001)
+        floored_qty = math.floor(size / tick) * tick
+        # Round to avoid floating point artifacts
+        decimals = max(0, -int(math.log10(tick)))
+        floored_qty = round(floored_qty, decimals)
+
+        if floored_qty < tick:
+            floored_qty = tick  # Minimum order size
 
         payload = {
             "symbol": settings.symbol,
@@ -400,10 +338,10 @@ class TradingEngine:
                 order_id=order_id,
                 side=side,
                 price=price,
-                size=size,
+                size=floored_qty,
             )
             log.info("engine.order_placed", order_id=order_id, side=side,
-                     price=round(price, 2), size=round(size, 6))
+                     price=round(price, 2), size=floored_qty)
             return order_id
 
         except httpx.HTTPStatusError as e:
@@ -465,59 +403,6 @@ class TradingEngine:
             log.info("engine.bulk_cancel_sent")
         except Exception as e:
             log.error("engine.bulk_cancel_error", error=str(e))
-
-    # ─── Position Sync ────────────────────────────────────────────
-
-    async def _sync_position(self, mark_price: float) -> None:
-        """Sync position data from exchange."""
-        try:
-            headers = await auth_manager.get_auth_headers()
-            resp = await self._client.get(
-                "/api/positions",
-                params={"symbol": settings.symbol},
-                headers=headers,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-            # Handle response format
-            if isinstance(data, dict) and "data" in data:
-                positions = data["data"]
-            elif isinstance(data, list):
-                positions = data
-            else:
-                positions = [data] if data else []
-
-            # Find position for our symbol
-            pos_data = {}
-            for p in (positions if isinstance(positions, list) else [positions]):
-                if isinstance(p, dict) and p.get("symbol") == settings.symbol:
-                    pos_data = p
-                    break
-
-            if pos_data:
-                size = float(pos_data.get("qty", pos_data.get("size", pos_data.get("quantity", 0))))
-                # Determine sign from side if available
-                side = pos_data.get("side", "")
-                if side == "short":
-                    size = -abs(size)
-
-                risk_manager.update_position(
-                    size=size,
-                    avg_entry=float(pos_data.get("entry_price", pos_data.get("avg_entry_price", 0))),
-                    mark_price=mark_price,
-                    unrealized_pnl=float(pos_data.get("unrealized_pnl", 0)),
-                    realized_pnl=float(pos_data.get("realized_pnl", 0)),
-                )
-            else:
-                # No position found — flat
-                risk_manager.update_position(
-                    size=0.0,
-                    avg_entry=0.0,
-                    mark_price=mark_price,
-                )
-        except Exception as e:
-            log.debug("engine.position_sync_error", error=str(e))
 
     async def close(self) -> None:
         """Cleanup resources."""

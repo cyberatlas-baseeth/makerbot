@@ -3,7 +3,7 @@ Configuration loader.
 
 All settings loaded from .env file via Pydantic BaseSettings.
 Runtime-modifiable fields: spread_bps, bid_notional, ask_notional,
-skew_factor_bps, refresh_interval, auto_close_fills.
+refresh_interval.
 """
 
 from __future__ import annotations
@@ -19,6 +19,14 @@ _CONFIG_DIR = Path(__file__).resolve().parent.parent
 
 # Supported trading pairs
 SUPPORTED_SYMBOLS = ["BTC-USD", "ETH-USD", "XAU-USD", "XAG-USD"]
+
+# Qty tick sizes per symbol (minimum qty increment accepted by StandX)
+QTY_TICKS: dict[str, float] = {
+    "BTC-USD": 0.0001,
+    "ETH-USD": 0.001,
+    "XAU-USD": 0.01,
+    "XAG-USD": 0.1,
+}
 
 
 class Settings(BaseSettings):
@@ -45,22 +53,14 @@ class Settings(BaseSettings):
     spread_bps: float = Field(default=50.0)         # Half-spread each side (test=50, prod=10)
     bid_notional: float = Field(default=30.0)        # Bid order size in USD
     ask_notional: float = Field(default=30.0)        # Ask order size in USD
-    order_size: float = Field(default=0.1)           # Legacy fallback
     refresh_interval: float = Field(default=1.0)       # Engine tick every 1s
-
-    # Inventory skew
-    skew_factor_bps: float = Field(default=3.0)      # Skew per unit position
 
     # Persistent order management
     requote_threshold_usd: float = Field(default=5.0)    # Refresh orders when mid moves ±$X
     proximity_guard_bps: float = Field(default=1.0)     # Auto-refresh when this close to being hit
 
-    # Auto-close fills
-    auto_close_fills: bool = Field(default=True)     # Market close if order fills
-
     # Risk limits
     max_notional: float = Field(default=10000.0)
-    max_position: float = Field(default=1.0)
 
     # Uptime
     uptime_target_minutes: int = Field(default=30)
@@ -79,11 +79,8 @@ def update_runtime_settings(
     spread_bps: float | None = None,
     bid_notional: float | None = None,
     ask_notional: float | None = None,
-    skew_factor_bps: float | None = None,
     requote_threshold_usd: float | None = None,
-    order_size: float | None = None,
     refresh_interval: float | None = None,
-    auto_close_fills: bool | None = None,
     symbol: str | None = None,
 ) -> dict[str, Any]:
     """Update runtime-modifiable settings. Returns updated values."""
@@ -103,19 +100,10 @@ def update_runtime_settings(
     if ask_notional is not None:
         settings.ask_notional = ask_notional
         updates["ask_notional"] = ask_notional
-    if skew_factor_bps is not None:
-        settings.skew_factor_bps = skew_factor_bps
-        updates["skew_factor_bps"] = skew_factor_bps
     if requote_threshold_usd is not None:
         settings.requote_threshold_usd = requote_threshold_usd
         updates["requote_threshold_usd"] = requote_threshold_usd
-    if order_size is not None:
-        settings.order_size = order_size
-        updates["order_size"] = order_size
     if refresh_interval is not None:
         settings.refresh_interval = refresh_interval
         updates["refresh_interval"] = refresh_interval
-    if auto_close_fills is not None:
-        settings.auto_close_fills = auto_close_fills
-        updates["auto_close_fills"] = auto_close_fills
     return updates

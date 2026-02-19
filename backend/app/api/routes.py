@@ -7,8 +7,7 @@ Endpoints:
   GET  /status      – Bot status, mid-price, spread
   GET  /orders      – Active orders list
   GET  /uptime      – Uptime stats (current hour + history)
-  GET  /positions   – Current position & PnL
-  POST /config      – Update symbol, spread_bps, order_size, refresh_interval
+  POST /config      – Update symbol, spread_bps, bid/ask notional, refresh_interval
   POST /kill        – Emergency kill-switch
 """
 
@@ -57,11 +56,8 @@ class ConfigUpdate(BaseModel):
     spread_bps: Optional[float] = None
     bid_notional: Optional[float] = None
     ask_notional: Optional[float] = None
-    skew_factor_bps: Optional[float] = None
     requote_threshold_usd: Optional[float] = None
-    order_size: Optional[float] = None
     refresh_interval: Optional[float] = None
-    auto_close_fills: Optional[bool] = None
 
 
 # --- Start / Stop ---
@@ -137,13 +133,6 @@ async def get_uptime() -> dict[str, Any]:
     return uptime_tracker.get_stats()
 
 
-@router.get("/positions")
-async def get_positions() -> dict[str, Any]:
-    """Get current position and risk status."""
-    from app.trading.risk import risk_manager
-    return risk_manager.get_status()
-
-
 # --- Config ---
 
 @router.post("/config")
@@ -186,11 +175,8 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
                 spread_bps=config.spread_bps,
                 bid_notional=config.bid_notional,
                 ask_notional=config.ask_notional,
-                skew_factor_bps=config.skew_factor_bps,
                 requote_threshold_usd=config.requote_threshold_usd,
-                order_size=config.order_size,
                 refresh_interval=config.refresh_interval,
-                auto_close_fills=config.auto_close_fills,
             )
 
             # 5. Restart engine if it was running
@@ -206,11 +192,8 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
                 spread_bps=config.spread_bps,
                 bid_notional=config.bid_notional,
                 ask_notional=config.ask_notional,
-                skew_factor_bps=config.skew_factor_bps,
                 requote_threshold_usd=config.requote_threshold_usd,
-                order_size=config.order_size,
                 refresh_interval=config.refresh_interval,
-                auto_close_fills=config.auto_close_fills,
             )
             if not updates:
                 raise HTTPException(status_code=400, detail="No valid fields to update")
@@ -224,10 +207,7 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
             "spread_bps": settings.spread_bps,
             "bid_notional": settings.bid_notional,
             "ask_notional": settings.ask_notional,
-            "skew_factor_bps": settings.skew_factor_bps,
             "requote_threshold_usd": settings.requote_threshold_usd,
-            "order_size": settings.order_size,
             "refresh_interval": settings.refresh_interval,
-            "auto_close_fills": settings.auto_close_fills,
         },
     }
