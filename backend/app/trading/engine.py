@@ -369,7 +369,6 @@ class TradingEngine:
             log.error("engine.place_order_error", error=str(e))
             raise
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, max=5))
     async def _cancel_order(self, order_id: str) -> None:
         """Cancel a specific order."""
         try:
