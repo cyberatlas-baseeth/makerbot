@@ -367,11 +367,18 @@ class TradingEngine:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, max=5))
     async def _place_order(self, side: str, price: float, size: float) -> str | None:
         """Place a limit order on StandX."""
+        # Floor qty to 1 decimal (0.1 tick) to satisfy API tick size
+        import math
+        floored_qty = math.floor(size * 10) / 10
+        if floored_qty <= 0:
+            log.warning("engine.qty_too_small", raw_size=size, floored=floored_qty)
+            return None
+
         payload = {
             "symbol": settings.symbol,
             "side": side,
             "order_type": "limit",
-            "qty": str(round(size, 8)),
+            "qty": str(floored_qty),
             "price": str(round(price, 2)),
             "time_in_force": "gtc",
             "reduce_only": False,
