@@ -28,6 +28,14 @@ QTY_TICKS: dict[str, float] = {
     "XAG-USD": 0.1,
 }
 
+# Price tick sizes per symbol (minimum price increment accepted by StandX)
+PRICE_TICKS: dict[str, float] = {
+    "BTC-USD": 0.01,
+    "ETH-USD": 0.1,
+    "XAU-USD": 0.1,
+    "XAG-USD": 0.01,
+}
+
 
 class Settings(BaseSettings):
     """Application settings loaded entirely from .env file."""

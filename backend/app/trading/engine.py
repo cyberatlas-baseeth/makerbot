@@ -22,7 +22,7 @@ from typing import Any
 
 import httpx
 
-from app.config import settings, QTY_TICKS
+from app.config import settings, QTY_TICKS, PRICE_TICKS
 from app.logger import get_logger
 from app.auth.jwt_auth import auth_manager
 from app.market_data.orderbook import Orderbook
@@ -326,12 +326,23 @@ class TradingEngine:
             )
             return None
 
+        # Round price to symbol's price tick
+        price_tick = PRICE_TICKS.get(settings.symbol, 0.01)
+        price_decimals = max(0, -int(math.log10(price_tick)))
+        if side == "buy":
+            # Bid: floor to tick (lower = safer for buyer)
+            rounded_price = math.floor(price / price_tick) * price_tick
+        else:
+            # Ask: ceil to tick (higher = safer for seller)
+            rounded_price = math.ceil(price / price_tick) * price_tick
+        rounded_price = round(rounded_price, price_decimals)
+
         payload = {
             "symbol": settings.symbol,
             "side": side,
             "order_type": "limit",
             "qty": str(floored_qty),
-            "price": str(round(price, 2)),
+            "price": str(rounded_price),
             "time_in_force": "gtc",
             "reduce_only": False,
         }
