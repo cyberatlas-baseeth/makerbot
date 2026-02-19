@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     # Engine safety
     max_consecutive_failures: int = Field(default=5)
     stale_order_seconds: float = Field(default=30.0)
-    max_spread_deviation_bps: float = Field(default=10.0)
+    max_spread_deviation_bps: float = Field(default=200.0)  # Max allowed deviation per side
 
 
 # Singleton
