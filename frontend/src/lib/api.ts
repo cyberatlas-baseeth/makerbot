@@ -39,7 +39,7 @@ export async function updateConfig(config: {
     spread_bps?: number;
     bid_notional?: number;
     ask_notional?: number;
-    requote_threshold_usd?: number;
+    requote_threshold_bps?: number;
     refresh_interval?: number;
 }) {
     const res = await fetch(`${API_BASE}/config`, {

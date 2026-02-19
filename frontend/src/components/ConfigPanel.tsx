@@ -8,7 +8,7 @@ interface ControlPanelProps {
     currentSpreadBps: number;
     currentBidNotional: number;
     currentAskNotional: number;
-    currentRequoteUsd: number;
+    currentRequoteBps: number;
     botStatus: string;
 }
 
@@ -17,14 +17,14 @@ export default function ControlPanel({
     currentSpreadBps,
     currentBidNotional,
     currentAskNotional,
-    currentRequoteUsd,
+    currentRequoteBps,
     botStatus,
 }: ControlPanelProps) {
     const [selectedSymbol, setSelectedSymbol] = useState('');
     const [spreadBps, setSpreadBps] = useState('');
     const [bidNotional, setBidNotional] = useState('');
     const [askNotional, setAskNotional] = useState('');
-    const [requoteUsd, setRequoteUsd] = useState('');
+    const [requoteBps, setRequoteBps] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
 
@@ -73,7 +73,7 @@ export default function ControlPanel({
             if (spreadBps) config.spread_bps = parseFloat(spreadBps);
             if (bidNotional) config.bid_notional = parseFloat(bidNotional);
             if (askNotional) config.ask_notional = parseFloat(askNotional);
-            if (requoteUsd) config.requote_threshold_usd = parseFloat(requoteUsd);
+            if (requoteBps) config.requote_threshold_bps = parseFloat(requoteBps);
 
             if (Object.keys(config).length === 0) {
                 showMessage('No changes to apply');
@@ -86,7 +86,7 @@ export default function ControlPanel({
             setSpreadBps('');
             setBidNotional('');
             setAskNotional('');
-            setRequoteUsd('');
+            setRequoteBps('');
             if (config.symbol) setSelectedSymbol('');
         } catch (err: any) {
             showMessage(`✗ ${err.message || 'Failed to update'}`);
@@ -137,16 +137,16 @@ export default function ControlPanel({
                 </div>
                 <div>
                     <label className="text-text-muted text-xs block mb-1.5">
-                        Requote ($): <span className="text-text-secondary">{currentRequoteUsd}</span>
+                        Requote (bps): <span className="text-text-secondary">{currentRequoteBps}</span>
                     </label>
                     <input
                         type="number"
                         step="1"
                         min="1"
                         className="config-input"
-                        placeholder={currentRequoteUsd.toString()}
-                        value={requoteUsd}
-                        onChange={(e) => setRequoteUsd(e.target.value)}
+                        placeholder={currentRequoteBps.toString()}
+                        value={requoteBps}
+                        onChange={(e) => setRequoteBps(e.target.value)}
                         disabled={loading}
                     />
                 </div>

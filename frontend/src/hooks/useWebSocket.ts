@@ -10,7 +10,7 @@ export interface BotState {
     configured_spread_bps: number;
     bid_notional: number;
     ask_notional: number;
-    requote_threshold_usd: number;
+    requote_threshold_bps: number;
     bid_spread_bps: number;
     ask_spread_bps: number;
     refresh_interval: number;
@@ -78,7 +78,7 @@ const INITIAL_STATE: BotState = {
     configured_spread_bps: 0,
     bid_notional: 500,
     ask_notional: 500,
-    requote_threshold_usd: 5,
+    requote_threshold_bps: 25,
     bid_spread_bps: 0,
     ask_spread_bps: 0,
     refresh_interval: 0,

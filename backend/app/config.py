@@ -3,7 +3,7 @@ Configuration loader.
 
 All settings loaded from .env file via Pydantic BaseSettings.
 Runtime-modifiable fields: spread_bps, bid_notional, ask_notional,
-refresh_interval.
+requote_threshold_bps, refresh_interval.
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     refresh_interval: float = Field(default=1.0)       # Engine tick every 1s
 
     # Persistent order management
-    requote_threshold_usd: float = Field(default=5.0)    # Refresh orders when mid moves ±$X
+    requote_threshold_bps: float = Field(default=25.0)    # Refresh orders when mid moves ±X bps
     proximity_guard_bps: float = Field(default=1.0)     # Auto-refresh when this close to being hit
 
     # Risk limits
@@ -79,7 +79,7 @@ def update_runtime_settings(
     spread_bps: float | None = None,
     bid_notional: float | None = None,
     ask_notional: float | None = None,
-    requote_threshold_usd: float | None = None,
+    requote_threshold_bps: float | None = None,
     refresh_interval: float | None = None,
     symbol: str | None = None,
 ) -> dict[str, Any]:
@@ -100,9 +100,9 @@ def update_runtime_settings(
     if ask_notional is not None:
         settings.ask_notional = ask_notional
         updates["ask_notional"] = ask_notional
-    if requote_threshold_usd is not None:
-        settings.requote_threshold_usd = requote_threshold_usd
-        updates["requote_threshold_usd"] = requote_threshold_usd
+    if requote_threshold_bps is not None:
+        settings.requote_threshold_bps = requote_threshold_bps
+        updates["requote_threshold_bps"] = requote_threshold_bps
     if refresh_interval is not None:
         settings.refresh_interval = refresh_interval
         updates["refresh_interval"] = refresh_interval

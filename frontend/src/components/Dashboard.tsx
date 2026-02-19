@@ -48,7 +48,7 @@ export default function Dashboard() {
                         currentSpreadBps={state.configured_spread_bps}
                         currentBidNotional={state.bid_notional}
                         currentAskNotional={state.ask_notional}
-                        currentRequoteUsd={state.requote_threshold_usd}
+                        currentRequoteBps={state.requote_threshold_bps}
                         botStatus={state.status}
                     />
                     <StatusCard

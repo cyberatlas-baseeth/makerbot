@@ -56,7 +56,7 @@ class ConfigUpdate(BaseModel):
     spread_bps: Optional[float] = None
     bid_notional: Optional[float] = None
     ask_notional: Optional[float] = None
-    requote_threshold_usd: Optional[float] = None
+    requote_threshold_bps: Optional[float] = None
     refresh_interval: Optional[float] = None
 
 
@@ -175,7 +175,7 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
                 spread_bps=config.spread_bps,
                 bid_notional=config.bid_notional,
                 ask_notional=config.ask_notional,
-                requote_threshold_usd=config.requote_threshold_usd,
+                requote_threshold_bps=config.requote_threshold_bps,
                 refresh_interval=config.refresh_interval,
             )
 
@@ -192,7 +192,7 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
                 spread_bps=config.spread_bps,
                 bid_notional=config.bid_notional,
                 ask_notional=config.ask_notional,
-                requote_threshold_usd=config.requote_threshold_usd,
+                requote_threshold_bps=config.requote_threshold_bps,
                 refresh_interval=config.refresh_interval,
             )
             if not updates:
@@ -207,7 +207,7 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
             "spread_bps": settings.spread_bps,
             "bid_notional": settings.bid_notional,
             "ask_notional": settings.ask_notional,
-            "requote_threshold_usd": settings.requote_threshold_usd,
+            "requote_threshold_bps": settings.requote_threshold_bps,
             "refresh_interval": settings.refresh_interval,
         },
     }
