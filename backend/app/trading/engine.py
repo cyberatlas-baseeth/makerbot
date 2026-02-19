@@ -369,10 +369,10 @@ class TradingEngine:
             log.error("engine.place_order_error", error=str(e))
             raise
 
-    async def _cancel_order(self, order_id: str) -> None:
-        """Cancel a specific order."""
+    async def _cancel_order_by_id(self, exchange_order_id: int) -> bool:
+        """Cancel a single order on the exchange using its integer ID."""
         try:
-            payload = json.dumps({"order_id": order_id})
+            payload = json.dumps({"order_id": exchange_order_id})
             headers = await auth_manager.get_full_headers(payload)
             headers["Content-Type"] = "application/json"
             resp = await self._client.post(
@@ -381,45 +381,57 @@ class TradingEngine:
                 headers=headers,
             )
             resp.raise_for_status()
-            log.info("engine.order_cancelled", order_id=order_id)
+            log.info("engine.order_cancelled", exchange_id=exchange_order_id)
+            return True
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                log.info("engine.order_already_gone", order_id=order_id)
-            else:
-                log.error("engine.cancel_failed",
-                          order_id=order_id, status=e.response.status_code,
-                          body=e.response.text[:200])
+                log.info("engine.order_already_gone", exchange_id=exchange_order_id)
+                return True  # Already gone = success
+            log.error("engine.cancel_failed",
+                      exchange_id=exchange_order_id,
+                      status=e.response.status_code,
+                      body=e.response.text[:200])
+            return False
         except Exception as e:
-            log.error("engine.cancel_error", order_id=order_id, error=str(e))
-        finally:
-            # Always mark as cancelled in internal state
-            if order_id in self._active_orders:
-                self._active_orders[order_id].status = "cancelled"
+            log.error("engine.cancel_error", exchange_id=exchange_order_id, error=str(e))
+            return False
 
     async def _cancel_all_orders(self) -> None:
-        """Cancel all open orders (best-effort), then clear internal state."""
-        open_orders = [
-            oid for oid, o in self._active_orders.items()
-            if o.status == "open"
-        ]
+        """Cancel all open orders on the exchange, then clear internal state.
+        
+        Queries the exchange for actual open orders and cancels each
+        using the integer order ID from the exchange.
+        """
+        cancelled = 0
+        failed = 0
 
-        # 1. Try individual cancels
-        for oid in open_orders:
-            await self._cancel_order(oid)
-
-        # 2. Bulk cancel via API as safety net
+        # 1. Query exchange for real open orders
         try:
-            payload = json.dumps({"symbol": settings.symbol})
-            headers = await auth_manager.get_full_headers(payload)
-            headers["Content-Type"] = "application/json"
-            resp = await self._client.post(
-                "/api/cancel_all_orders",
-                content=payload,
+            headers = await auth_manager.get_full_headers("")
+            resp = await self._client.get(
+                "/api/query_open_orders",
+                params={"symbol": settings.symbol},
                 headers=headers,
             )
-            log.info("engine.bulk_cancel_sent", status=resp.status_code)
+            resp.raise_for_status()
+            data = resp.json()
+            exchange_orders = data.get("result", [])
+            log.info("engine.fetched_open_orders", count=len(exchange_orders))
         except Exception as e:
-            log.error("engine.bulk_cancel_error", error=str(e))
+            log.error("engine.fetch_open_orders_failed", error=str(e))
+            exchange_orders = []
+
+        # 2. Cancel each order using integer ID
+        for order in exchange_orders:
+            exchange_id = order.get("id")
+            if exchange_id is not None:
+                ok = await self._cancel_order_by_id(exchange_id)
+                if ok:
+                    cancelled += 1
+                else:
+                    failed += 1
+
+        log.info("engine.cancel_all_done", cancelled=cancelled, failed=failed)
 
         # 3. Clear all internal order tracking
         self._active_orders.clear()
