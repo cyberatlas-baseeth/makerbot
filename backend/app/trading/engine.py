@@ -381,44 +381,49 @@ class TradingEngine:
                 headers=headers,
             )
             resp.raise_for_status()
-            if order_id in self._active_orders:
-                self._active_orders[order_id].status = "cancelled"
             log.info("engine.order_cancelled", order_id=order_id)
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                if order_id in self._active_orders:
-                    self._active_orders[order_id].status = "gone"
                 log.info("engine.order_already_gone", order_id=order_id)
             else:
                 log.error("engine.cancel_failed",
-                          order_id=order_id, status=e.response.status_code)
-                raise
+                          order_id=order_id, status=e.response.status_code,
+                          body=e.response.text[:200])
+        except Exception as e:
+            log.error("engine.cancel_error", order_id=order_id, error=str(e))
+        finally:
+            # Always mark as cancelled in internal state
+            if order_id in self._active_orders:
+                self._active_orders[order_id].status = "cancelled"
 
     async def _cancel_all_orders(self) -> None:
-        """Cancel all open orders (best-effort)."""
+        """Cancel all open orders (best-effort), then clear internal state."""
         open_orders = [
             oid for oid, o in self._active_orders.items()
             if o.status == "open"
         ]
-        for oid in open_orders:
-            try:
-                await self._cancel_order(oid)
-            except Exception as e:
-                log.error("engine.cancel_all_error", order_id=oid, error=str(e))
 
-        # Bulk cancel via API
+        # 1. Try individual cancels
+        for oid in open_orders:
+            await self._cancel_order(oid)
+
+        # 2. Bulk cancel via API as safety net
         try:
             payload = json.dumps({"symbol": settings.symbol})
             headers = await auth_manager.get_full_headers(payload)
             headers["Content-Type"] = "application/json"
-            await self._client.post(
+            resp = await self._client.post(
                 "/api/cancel_all_orders",
                 content=payload,
                 headers=headers,
             )
-            log.info("engine.bulk_cancel_sent")
+            log.info("engine.bulk_cancel_sent", status=resp.status_code)
         except Exception as e:
             log.error("engine.bulk_cancel_error", error=str(e))
+
+        # 3. Clear all internal order tracking
+        self._active_orders.clear()
+        log.info("engine.orders_cleared")
 
     async def close(self) -> None:
         """Cleanup resources."""
