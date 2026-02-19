@@ -21,7 +21,6 @@ from enum import Enum
 from typing import Any
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings, QTY_TICKS
 from app.logger import get_logger
@@ -298,9 +297,12 @@ class TradingEngine:
 
     # ─── Order Management ─────────────────────────────────────────
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, max=5))
     async def _place_order(self, side: str, price: float, size: float) -> str | None:
-        """Place a limit order on StandX."""
+        """Place a limit order on StandX.
+
+        Returns order_id on success, None if skipped or soft-failed.
+        Only raises on transient errors (network, 5xx) — NOT on 400 qty errors.
+        """
         # Round qty to symbol's tick size
         tick = QTY_TICKS.get(settings.symbol, 0.0001)
         floored_qty = math.floor(size / tick) * tick
@@ -309,7 +311,16 @@ class TradingEngine:
         floored_qty = round(floored_qty, decimals)
 
         if floored_qty < tick:
-            floored_qty = tick  # Minimum order size
+            # Notional too small for this symbol — skip gracefully
+            log.warning(
+                "engine.qty_too_small",
+                side=side,
+                raw_size=round(size, 8),
+                min_tick=tick,
+                symbol=settings.symbol,
+                hint=f"Increase bid/ask notional. Min order: {tick} * ${price:.0f} = ${tick * price:.2f}",
+            )
+            return None
 
         payload = {
             "symbol": settings.symbol,
@@ -345,8 +356,14 @@ class TradingEngine:
             return order_id
 
         except httpx.HTTPStatusError as e:
+            body = e.response.text[:200]
+            if e.response.status_code == 400 and "qty" in body.lower():
+                # Qty tick error from exchange — don't retry, don't crash
+                log.warning("engine.qty_rejected_by_exchange",
+                            side=side, qty=floored_qty, body=body)
+                return None
             log.error("engine.place_order_failed",
-                      status=e.response.status_code, body=e.response.text[:200])
+                      status=e.response.status_code, body=body)
             raise
         except Exception as e:
             log.error("engine.place_order_error", error=str(e))
