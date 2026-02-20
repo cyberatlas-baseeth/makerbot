@@ -197,6 +197,13 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
             )
             if not updates:
                 raise HTTPException(status_code=400, detail="No valid fields to update")
+
+            # Force refresh orders so new config takes effect immediately
+            from app.trading.engine import BotStatus
+            if _engine is not None and _engine.status == BotStatus.RUNNING:
+                await _engine._cancel_all_orders()
+                log.info("api.orders_refreshed_after_config", updates=updates)
+
             log.info("api.config_updated", updates=updates)
 
     return {
