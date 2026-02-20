@@ -1,0 +1,423 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+/* ── BRUTALIST DESIGN SYSTEM ─────────────── */
+@theme {
+  /* Primary palette */
+  --color-acid: #F2C200;
+  --color-orange: #D65A00;
+  --color-sage: #9FB2A8;
+  --color-teal: #0F2F3A;
+  --color-offwhite: #E6E4D8;
+  --color-black: #111111;
+  --color-charcoal: #1a1a1a;
+
+  /* Functional */
+  --color-border: #333333;
+  --color-border-strong: #555555;
+  --color-text-primary: #E6E4D8;
+  --color-text-dark: #111111;
+  --color-text-muted: #777777;
+  --color-success: #2ecc71;
+  --color-danger: #e74c3c;
+  --color-warning: #f39c12;
+}
+
+/* ── BASE ───────────────────────────────── */
+body {
+  margin: 0;
+  background: var(--color-black);
+  color: var(--color-text-primary);
+  font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* ── PANEL BASES ────────────────────────── */
+.panel {
+  padding: 28px 24px;
+  border: 2px solid var(--color-border);
+}
+
+.panel-yellow {
+  background: var(--color-acid);
+  color: var(--color-text-dark);
+  border-color: var(--color-text-dark);
+}
+
+.panel-sage {
+  background: var(--color-sage);
+  color: var(--color-text-dark);
+  border-color: var(--color-text-dark);
+}
+
+.panel-orange {
+  background: var(--color-orange);
+  color: var(--color-offwhite);
+  border-color: var(--color-text-dark);
+}
+
+.panel-dark {
+  background: var(--color-charcoal);
+  color: var(--color-offwhite);
+  border-color: var(--color-border);
+}
+
+/* ── TYPOGRAPHY ─────────────────────────── */
+.heading-xl {
+  font-size: 2.2rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin: 0;
+}
+
+.heading-lg {
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.heading-sm {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  line-height: 1;
+  margin: 0;
+}
+
+.metric-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.metric-value-lg {
+  font-size: 2.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.metric-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  opacity: 0.7;
+}
+
+/* ── METRIC BLOCK ───────────────────────── */
+.metric-block {
+  padding: 16px;
+  border: 2px solid;
+  border-color: inherit;
+}
+
+.metric-block-dark {
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
+.metric-block-light {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ── DIVIDER ────────────────────────────── */
+.divider {
+  border: none;
+  border-top: 2px solid;
+  border-color: inherit;
+  margin: 16px 0;
+  opacity: 0.3;
+}
+
+.divider-strong {
+  opacity: 1;
+}
+
+/* ── STATUS INDICATORS ─────────────────── */
+.status-dot {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+}
+
+.status-dot-active {
+  background: var(--color-success);
+}
+
+.status-dot-inactive {
+  background: var(--color-danger);
+}
+
+.status-dot-idle {
+  background: var(--color-text-muted);
+}
+
+.status-dot-warning {
+  background: var(--color-warning);
+}
+
+/* Status badge */
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 2px solid;
+}
+
+.badge-running {
+  background: var(--color-success);
+  color: #000;
+  border-color: #000;
+}
+
+.badge-stopped {
+  background: var(--color-text-muted);
+  color: #fff;
+  border-color: #000;
+}
+
+.badge-error,
+.badge-killed {
+  background: var(--color-danger);
+  color: #fff;
+  border-color: #000;
+}
+
+.badge-paused {
+  background: var(--color-warning);
+  color: #000;
+  border-color: #000;
+}
+
+.badge-starting {
+  background: var(--color-teal);
+  color: #fff;
+  border-color: #000;
+}
+
+/* ── BUTTONS ───────────────────────────── */
+.btn {
+  display: block;
+  width: 100%;
+  padding: 14px 24px;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border: 2px solid var(--color-text-dark);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  text-align: center;
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-start {
+  background: var(--color-teal);
+  color: var(--color-offwhite);
+  border-color: var(--color-text-dark);
+}
+
+.btn-start:hover:not(:disabled) {
+  background: #0a1f28;
+}
+
+.btn-stop {
+  background: var(--color-danger);
+  color: #fff;
+  border-color: var(--color-text-dark);
+}
+
+.btn-stop:hover:not(:disabled) {
+  background: #c0392b;
+}
+
+.btn-apply {
+  background: var(--color-text-dark);
+  color: var(--color-acid);
+  border-color: var(--color-text-dark);
+}
+
+.btn-apply:hover:not(:disabled) {
+  background: #222;
+}
+
+/* ── INPUTS ────────────────────────────── */
+.input-brutal {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(0, 0, 0, 0.4);
+  color: var(--color-text-dark);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input-brutal::placeholder {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.input-brutal:focus {
+  border-color: var(--color-text-dark);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.select-brutal {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(0, 0, 0, 0.4);
+  color: var(--color-text-dark);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23111' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  outline: none;
+}
+
+.select-brutal:focus {
+  border-color: var(--color-text-dark);
+}
+
+.select-brutal option {
+  background: var(--color-acid);
+  color: var(--color-text-dark);
+}
+
+/* ── PROGRESS BAR ──────────────────────── */
+.progress-track {
+  width: 100%;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  transition: width 0.6s ease;
+}
+
+.progress-fill-maker {
+  background: var(--color-teal);
+}
+
+.progress-fill-mm {
+  background: var(--color-orange);
+}
+
+/* ── TABLE ─────────────────────────────── */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.3);
+}
+
+.data-table td {
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.data-table tr:hover td {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* ── UTILITY ───────────────────────────── */
+.text-success {
+  color: var(--color-success);
+}
+
+.text-danger {
+  color: var(--color-danger);
+}
+
+.text-warning {
+  color: var(--color-warning);
+}
+
+/* ── SCROLLBAR ─────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* ── LOADING SPINNER ───────────────────── */
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-top-color: currentColor;
+  display: inline-block;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── HISTORY BARS ──────────────────────── */
+.history-bar {
+  flex: 1;
+  min-width: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  position: relative;
+}
+
+.history-bar:hover {
+  opacity: 0.85;
+}
