@@ -315,16 +315,15 @@ class TradingEngine:
         floored_qty = round(floored_qty, decimals)
 
         if floored_qty < tick:
-            # Notional too small for this symbol — skip gracefully
-            log.warning(
-                "engine.qty_too_small",
+            # Notional too small — use minimum qty (1 tick) to keep uptime
+            floored_qty = tick
+            log.info(
+                "engine.qty_bumped_to_min",
                 side=side,
                 raw_size=round(size, 8),
                 min_tick=tick,
                 symbol=settings.symbol,
-                hint=f"Increase bid/ask notional. Min order: {tick} * ${price:.0f} = ${tick * price:.2f}",
             )
-            return None
 
         # Round price to symbol's price tick
         price_tick = PRICE_TICKS.get(settings.symbol, 0.01)
