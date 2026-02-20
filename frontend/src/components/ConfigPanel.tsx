@@ -41,9 +41,9 @@ export default function ControlPanel({
         setLoading(true);
         try {
             await startBot();
-            showMessage('✓ Engine started');
+            showMessage('ENGINE STARTED');
         } catch (err: any) {
-            showMessage(`✗ ${err.message || 'Failed to start'}`);
+            showMessage(`ERROR: ${err.message || 'Failed'}`);
         }
         setLoading(false);
     };
@@ -53,9 +53,9 @@ export default function ControlPanel({
         setLoading(true);
         try {
             await stopBot();
-            showMessage('✓ Engine stopped');
+            showMessage('ENGINE STOPPED');
         } catch (err: any) {
-            showMessage(`✗ ${err.message || 'Failed to stop'}`);
+            showMessage(`ERROR: ${err.message || 'Failed'}`);
         }
         setLoading(false);
     };
@@ -66,7 +66,6 @@ export default function ControlPanel({
         setMessage('');
         try {
             const config: Record<string, any> = {};
-
             if (selectedSymbol && selectedSymbol !== currentSymbol) {
                 config.symbol = selectedSymbol;
             }
@@ -76,38 +75,42 @@ export default function ControlPanel({
             if (requoteBps) config.requote_threshold_bps = parseFloat(requoteBps);
 
             if (Object.keys(config).length === 0) {
-                showMessage('No changes to apply');
+                showMessage('NO CHANGES');
                 setLoading(false);
                 return;
             }
 
             await updateConfig(config);
-            showMessage(config.symbol ? `✓ Switched to ${config.symbol}` : '✓ Config updated');
+            showMessage(config.symbol ? `SWITCHED: ${config.symbol}` : 'CONFIG UPDATED');
             setSpreadBps('');
             setBidNotional('');
             setAskNotional('');
             setRequoteBps('');
             if (config.symbol) setSelectedSymbol('');
         } catch (err: any) {
-            showMessage(`✗ ${err.message || 'Failed to update'}`);
+            showMessage(`ERROR: ${err.message || 'Failed'}`);
         }
         setLoading(false);
     };
 
-
     return (
-        <div className="glass-card animate-fade-in" style={{ animationDelay: '0.05s' }}>
-            <h2 className="text-sm font-semibold tracking-wider uppercase text-text-secondary mb-5">
-                Control Panel
-            </h2>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {/* Title */}
+            <h1 className="heading-xl" style={{ marginBottom: '4px' }}>MAKER</h1>
+            <h1 className="heading-xl" style={{ marginBottom: '16px' }}>BOT</h1>
+            <div style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', opacity: 0.5, marginBottom: '24px' }}>
+                UPTIME OPTIMIZED QUOTING
+            </div>
 
-            {/* Pair Selector */}
-            <div className="mb-4">
-                <label className="text-text-muted text-xs block mb-1.5">
-                    Trading Pair — active: <span className="text-text-primary font-semibold">{currentSymbol}</span>
+            <hr className="divider divider-strong" style={{ borderColor: 'rgba(0,0,0,0.2)' }} />
+
+            {/* Symbol */}
+            <div style={{ marginBottom: '14px' }}>
+                <label className="metric-label" style={{ display: 'block', marginBottom: '6px', opacity: 1, color: 'rgba(0,0,0,0.6)' }}>
+                    SYMBOL — {currentSymbol}
                 </label>
                 <select
-                    className="select-dropdown"
+                    className="select-brutal"
                     value={selectedSymbol || currentSymbol}
                     onChange={(e) => setSelectedSymbol(e.target.value === currentSymbol ? '' : e.target.value)}
                     disabled={loading}
@@ -118,17 +121,17 @@ export default function ControlPanel({
                 </select>
             </div>
 
-            {/* Spread & Requote */}
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            {/* Spread + Requote */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                 <div>
-                    <label className="text-text-muted text-xs block mb-1.5">
-                        Spread (bps): <span className="text-text-secondary">{currentSpreadBps}</span>
+                    <label className="metric-label" style={{ display: 'block', marginBottom: '4px', opacity: 1, color: 'rgba(0,0,0,0.6)' }}>
+                        SPREAD BPS
                     </label>
                     <input
                         type="number"
                         step="0.5"
                         min="1"
-                        className="config-input"
+                        className="input-brutal"
                         placeholder={currentSpreadBps.toString()}
                         value={spreadBps}
                         onChange={(e) => setSpreadBps(e.target.value)}
@@ -136,14 +139,14 @@ export default function ControlPanel({
                     />
                 </div>
                 <div>
-                    <label className="text-text-muted text-xs block mb-1.5">
-                        Requote (bps): <span className="text-text-secondary">{currentRequoteBps}</span>
+                    <label className="metric-label" style={{ display: 'block', marginBottom: '4px', opacity: 1, color: 'rgba(0,0,0,0.6)' }}>
+                        REQUOTE BPS
                     </label>
                     <input
                         type="number"
                         step="1"
                         min="1"
-                        className="config-input"
+                        className="input-brutal"
                         placeholder={currentRequoteBps.toString()}
                         value={requoteBps}
                         onChange={(e) => setRequoteBps(e.target.value)}
@@ -152,17 +155,17 @@ export default function ControlPanel({
                 </div>
             </div>
 
-            {/* Bid Notional & Ask Notional */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            {/* Bid / Ask Notional */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
                 <div>
-                    <label className="text-text-muted text-xs block mb-1.5">
-                        Bid ($): <span className="text-text-secondary">{currentBidNotional}</span>
+                    <label className="metric-label" style={{ display: 'block', marginBottom: '4px', opacity: 1, color: 'rgba(0,0,0,0.6)' }}>
+                        BID $
                     </label>
                     <input
                         type="number"
                         step="50"
                         min="10"
-                        className="config-input"
+                        className="input-brutal"
                         placeholder={currentBidNotional.toString()}
                         value={bidNotional}
                         onChange={(e) => setBidNotional(e.target.value)}
@@ -170,14 +173,14 @@ export default function ControlPanel({
                     />
                 </div>
                 <div>
-                    <label className="text-text-muted text-xs block mb-1.5">
-                        Ask ($): <span className="text-text-secondary">{currentAskNotional}</span>
+                    <label className="metric-label" style={{ display: 'block', marginBottom: '4px', opacity: 1, color: 'rgba(0,0,0,0.6)' }}>
+                        ASK $
                     </label>
                     <input
                         type="number"
                         step="50"
                         min="10"
-                        className="config-input"
+                        className="input-brutal"
                         placeholder={currentAskNotional.toString()}
                         value={askNotional}
                         onChange={(e) => setAskNotional(e.target.value)}
@@ -186,49 +189,69 @@ export default function ControlPanel({
                 </div>
             </div>
 
-            {/* Apply Config */}
+            {/* Apply */}
             <button
                 onClick={handleApplyConfig}
                 disabled={loading}
-                className="w-full bg-accent hover:bg-accent-hover text-white py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 cursor-pointer mb-4"
+                className="btn btn-apply"
+                style={{ marginBottom: '12px' }}
             >
                 {loading && (selectedSymbol && selectedSymbol !== currentSymbol) ? (
-                    <span className="flex items-center justify-center gap-2">
-                        <span className="spinner" /> Switching...
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <span className="spinner" /> SWITCHING...
                     </span>
                 ) : (
-                    'Apply Config'
+                    'APPLY CONFIG'
                 )}
             </button>
 
+            <hr className="divider divider-strong" style={{ borderColor: 'rgba(0,0,0,0.2)' }} />
+
             {/* Start / Stop */}
-            <div className="flex gap-3 mb-4">
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
                 <button
                     id="btn-start"
                     onClick={handleStart}
                     disabled={isRunning || loading}
-                    className="btn-start flex-1 flex items-center justify-center gap-2"
+                    className="btn btn-start"
+                    style={{ flex: 1 }}
                 >
-                    {loading && !isRunning ? <span className="spinner" /> : '▶'}
-                    START
+                    {loading && !isRunning ? <span className="spinner" /> : null}
+                    {' '}START
                 </button>
                 <button
                     id="btn-stop"
                     onClick={handleStop}
                     disabled={isStopped || loading}
-                    className="btn-stop flex-1 flex items-center justify-center gap-2"
+                    className="btn btn-stop"
+                    style={{ flex: 1 }}
                 >
-                    {loading && isRunning ? <span className="spinner" /> : '■'}
-                    STOP
+                    {loading && isRunning ? <span className="spinner" /> : null}
+                    {' '}STOP
                 </button>
             </div>
 
             {/* Message */}
             {message && (
-                <p className={`text-xs text-center mb-3 ${message.startsWith('✓') ? 'num-green' : message.startsWith('✗') ? 'num-red' : 'text-warning'}`}>
+                <div style={{
+                    padding: '8px 12px',
+                    border: '2px solid rgba(0,0,0,0.3)',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    background: message.startsWith('ERROR') ? 'rgba(231,76,60,0.2)' : 'rgba(0,0,0,0.1)',
+                    textAlign: 'center',
+                }}>
                     {message}
-                </p>
+                </div>
             )}
+
+            {/* Spacer to push version to bottom */}
+            <div style={{ flex: 1 }} />
+            <div style={{ fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.35, marginTop: '16px' }}>
+                LOCAL ONLY — NOT FOR PRODUCTION
+            </div>
         </div>
     );
 }

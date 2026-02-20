@@ -6,45 +6,62 @@ interface OrdersTableProps {
 
 export default function OrdersTable({ orders }: OrdersTableProps) {
     return (
-        <div className="glass-card animate-fade-in" style={{ animationDelay: '0.15s' }}>
-            <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold tracking-wider uppercase text-text-secondary">
-                    Active Orders
-                </h2>
-                <span className="text-xs text-text-muted font-mono">{orders.length} orders</span>
-            </div>
+        <div>
+            <h3 className="heading-lg" style={{ marginBottom: '12px' }}>OPEN ORDERS</h3>
 
             {orders.length === 0 ? (
-                <div className="text-center py-8 text-text-muted text-sm">
-                    No active orders
+                <div style={{
+                    padding: '20px',
+                    border: '2px solid rgba(0,0,0,0.15)',
+                    textAlign: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    opacity: 0.4,
+                }}>
+                    NO ACTIVE ORDERS
                 </div>
             ) : (
-                <div className="overflow-x-auto">
+                <div style={{ border: '2px solid rgba(0,0,0,0.2)', overflow: 'hidden' }}>
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>Side</th>
-                                <th>Price</th>
-                                <th>Size</th>
-                                <th>Age</th>
-                                <th>Status</th>
+                                <th>SIDE</th>
+                                <th>PRICE</th>
+                                <th>SIZE</th>
+                                <th>AGE</th>
+                                <th>STATUS</th>
                             </tr>
                         </thead>
                         <tbody>
                             {orders.map((order) => (
                                 <tr key={order.order_id}>
                                     <td>
-                                        <span className={`font-semibold ${order.side === 'buy' ? 'num-green' : 'num-red'}`}>
-                                            {order.side.toUpperCase()}
+                                        <span style={{
+                                            fontWeight: 700,
+                                            textTransform: 'uppercase',
+                                            color: order.side === 'buy' ? '#0F2F3A' : '#D65A00',
+                                        }}>
+                                            {order.side}
                                         </span>
                                     </td>
-                                    <td className="font-mono">
+                                    <td style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
                                         ${order.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                                     </td>
-                                    <td className="font-mono">{order.size}</td>
-                                    <td className="font-mono text-text-secondary">{order.age_seconds.toFixed(0)}s</td>
+                                    <td style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                        {order.size.toFixed(6)}
+                                    </td>
+                                    <td style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                        {order.age_seconds.toFixed(0)}s
+                                    </td>
                                     <td>
-                                        <span className={`badge ${order.status === 'open' ? 'badge-running' : 'badge-paused'}`}>
+                                        <span style={{
+                                            fontSize: '0.65rem',
+                                            fontWeight: 700,
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.08em',
+                                        }}>
                                             {order.status}
                                         </span>
                                     </td>
