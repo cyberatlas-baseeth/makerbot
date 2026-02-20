@@ -9,7 +9,9 @@ Runs locally on localhost:8000.
 from __future__ import annotations
 
 import asyncio
+import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
@@ -92,12 +94,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow frontend on localhost:5173
+# CORS — allow frontend on localhost:5173 (dev) and same-origin (exe)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -109,13 +113,53 @@ app.include_router(routes.router, prefix="/api")
 app.include_router(ws.router)
 
 
-@app.get("/")
-async def root() -> dict[str, str]:
-    return {
-        "service": "Market Maker Bot",
-        "version": "2.0.0",
-        "docs": "/docs",
-    }
+# ── Static file serving (frontend build) ─────────────────────────
+def _get_static_dir() -> Path | None:
+    """Find the frontend dist directory."""
+    if getattr(sys, "frozen", False):
+        # PyInstaller: files extracted to _MEIPASS
+        bundle_dir = Path(sys._MEIPASS)  # type: ignore[attr-defined]
+        dist = bundle_dir / "frontend_dist"
+        if dist.exists():
+            return dist
+    else:
+        # Development: look for frontend/dist relative to backend
+        dev_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+        if dev_dist.exists():
+            return dev_dist
+    return None
+
+
+_static_dir = _get_static_dir()
+
+if _static_dir:
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    @app.get("/")
+    async def root():
+        return FileResponse(_static_dir / "index.html")
+
+    # Serve static assets (JS, CSS, images)
+    app.mount("/assets", StaticFiles(directory=str(_static_dir / "assets")), name="static")
+
+    # SPA fallback — any unknown route serves index.html
+    @app.get("/{path:path}")
+    async def spa_fallback(path: str):
+        # Try exact file first
+        file = _static_dir / path
+        if file.is_file():
+            return FileResponse(file)
+        return FileResponse(_static_dir / "index.html")
+else:
+    @app.get("/")
+    async def root() -> dict[str, str]:
+        return {
+            "service": "Market Maker Bot",
+            "version": "2.0.0",
+            "docs": "/docs",
+            "note": "Frontend not found. Run 'npm run build' in frontend/ first.",
+        }
 
 
 @app.get("/health")

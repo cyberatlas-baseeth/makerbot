@@ -8,6 +8,7 @@ requote_threshold_bps, refresh_interval.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,14 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-_CONFIG_DIR = Path(__file__).resolve().parent.parent
+def _get_env_path() -> Path:
+    """Return .env path — next to exe when frozen, else next to backend dir."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent / ".env"
+    return Path(__file__).resolve().parent.parent / ".env"
+
+
+_ENV_FILE = _get_env_path()
 
 # Supported trading pairs
 SUPPORTED_SYMBOLS = ["BTC-USD", "ETH-USD", "XAU-USD", "XAG-USD"]
@@ -41,7 +49,7 @@ class Settings(BaseSettings):
     """Application settings loaded entirely from .env file."""
 
     model_config = SettingsConfigDict(
-        env_file=str(_CONFIG_DIR / ".env"),
+        env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",
         extra="ignore",
     )
