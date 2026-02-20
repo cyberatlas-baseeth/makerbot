@@ -172,7 +172,8 @@ class TradingEngine:
             "loop_count": self._loop_count,
             "consecutive_failures": self._consecutive_failures,
             "uptime": uptime_stats,
-            "uptime_percentage": uptime_stats.get("current_hour", {}).get("uptime_pct", 0),
+            "uptime_percentage": uptime_stats.get("current_hour", {}).get("maker_uptime_pct", 0),
+            "mm_uptime_percentage": uptime_stats.get("current_hour", {}).get("mm_uptime_pct", 0),
         }
 
     # ─── Main Loop ────────────────────────────────────────────────
@@ -285,7 +286,10 @@ class TradingEngine:
         open_orders = [o for o in self._active_orders.values() if o.status == "open"]
         has_active_bid = any(o.side == "buy" for o in open_orders)
         has_active_ask = any(o.side == "sell" for o in open_orders)
-        uptime_tracker.tick(has_both_sides=has_active_bid and has_active_ask)
+        uptime_tracker.tick(
+            has_both_sides=has_active_bid and has_active_ask,
+            spread_bps=settings.spread_bps,
+        )
 
         log.info(
             "engine.tick",
@@ -296,7 +300,8 @@ class TradingEngine:
             bid_spread=round(quote.bid_spread_bps, 2),
             ask_spread=round(quote.ask_spread_bps, 2),
             active_orders=len(open_orders),
-            uptime_pct=round(uptime_tracker.current_uptime_pct, 2),
+            maker_uptime_pct=round(uptime_tracker.current_maker_uptime_pct, 2),
+            mm_uptime_pct=round(uptime_tracker.current_mm_uptime_pct, 2),
         )
 
     # ─── Order Management ─────────────────────────────────────────

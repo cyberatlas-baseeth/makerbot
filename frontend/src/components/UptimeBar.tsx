@@ -6,12 +6,13 @@ interface UptimeBarProps {
 
 export default function UptimeBar({ uptime }: UptimeBarProps) {
     const { current_hour } = uptime;
-    const pct = Math.min(current_hour.uptime_pct, 100);
+    const makerPct = Math.min(current_hour.maker_uptime_pct, 100);
+    const mmPct = Math.min(current_hour.mm_uptime_pct, 100);
     const targetPct = (current_hour.target_seconds / 3600) * 100; // 50% for 30 min
 
-    const getBarColor = () => {
-        if (current_hour.target_met) return 'linear-gradient(90deg, #10b981, #34d399)';
-        if (pct >= targetPct * 0.7) return 'linear-gradient(90deg, #f59e0b, #fbbf24)';
+    const getMakerBarColor = () => {
+        if (current_hour.maker_target_met) return 'linear-gradient(90deg, #10b981, #34d399)';
+        if (makerPct >= targetPct * 0.7) return 'linear-gradient(90deg, #f59e0b, #fbbf24)';
         return 'linear-gradient(90deg, #ef4444, #f87171)';
     };
 
@@ -23,23 +24,23 @@ export default function UptimeBar({ uptime }: UptimeBarProps) {
 
     return (
         <div className="glass-card animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            {/* Maker Uptime (≤5 bps) */}
             <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold tracking-wider uppercase text-text-secondary">
-                    Maker Uptime
+                    ⭐ Maker Uptime <span className="text-text-muted font-normal normal-case">(≤ 5 bps)</span>
                 </h2>
-                <span className={`badge ${current_hour.target_met ? 'badge-running' : 'badge-paused'}`}>
-                    {current_hour.target_met ? 'TARGET MET' : 'IN PROGRESS'}
+                <span className={`badge ${current_hour.maker_target_met ? 'badge-running' : 'badge-paused'}`}>
+                    {current_hour.maker_target_met ? 'TARGET MET' : 'IN PROGRESS'}
                 </span>
             </div>
 
-            {/* Main progress bar */}
+            {/* Maker progress bar */}
             <div className="mb-3">
                 <div className="flex justify-between text-xs text-text-muted mb-1.5">
-                    <span>Active: {fmtTime(current_hour.total_active_seconds)}</span>
-                    <span>{pct.toFixed(1)}%</span>
+                    <span>Active: {fmtTime(current_hour.maker_active_seconds)}</span>
+                    <span>{makerPct.toFixed(1)}%</span>
                 </div>
                 <div className="progress-outer relative">
-                    {/* Target marker line */}
                     <div
                         className="absolute top-0 bottom-0 w-0.5 bg-text-muted z-10 opacity-60"
                         style={{ left: `${targetPct}%` }}
@@ -47,8 +48,8 @@ export default function UptimeBar({ uptime }: UptimeBarProps) {
                     <div
                         className="progress-inner"
                         style={{
-                            width: `${pct}%`,
-                            background: getBarColor(),
+                            width: `${makerPct}%`,
+                            background: getMakerBarColor(),
                         }}
                     />
                 </div>
@@ -58,6 +59,30 @@ export default function UptimeBar({ uptime }: UptimeBarProps) {
                     <span>60m</span>
                 </div>
             </div>
+
+            {/* Market Maker Uptime (>5 bps) */}
+            {mmPct > 0 && (
+                <div className="mb-3 mt-4 pt-3 border-t border-border">
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold tracking-wider uppercase text-text-secondary">
+                            📊 Market Maker <span className="text-text-muted font-normal normal-case">(&gt; 5 bps)</span>
+                        </h3>
+                        <span className="text-xs text-text-muted">{mmPct.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-text-muted mb-1.5">
+                        <span>Active: {fmtTime(current_hour.mm_active_seconds)}</span>
+                    </div>
+                    <div className="progress-outer">
+                        <div
+                            className="progress-inner"
+                            style={{
+                                width: `${mmPct}%`,
+                                background: 'linear-gradient(90deg, #6366f1, #818cf8)',
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3 mt-4">
                 <div className="rounded-lg bg-[rgba(15,23,42,0.6)] p-3 text-center">
@@ -87,7 +112,7 @@ export default function UptimeBar({ uptime }: UptimeBarProps) {
                 <div className="mt-4 pt-3 border-t border-border">
                     <div className="flex justify-between text-xs text-text-muted mb-2">
                         <span>Last 24h: {uptime.hours_target_met_last_24h} hours met</span>
-                        <span>Avg: {uptime.avg_uptime_pct_last_24h.toFixed(1)}%</span>
+                        <span>Maker Avg: {uptime.avg_maker_uptime_pct_last_24h.toFixed(1)}%</span>
                     </div>
                     <div className="flex gap-0.5">
                         {uptime.history.map((h, i) => (
@@ -95,11 +120,11 @@ export default function UptimeBar({ uptime }: UptimeBarProps) {
                                 key={i}
                                 className="flex-1 h-3 rounded-sm"
                                 style={{
-                                    background: h.target_met
+                                    background: h.maker_target_met
                                         ? 'rgba(16, 185, 129, 0.6)'
                                         : 'rgba(239, 68, 68, 0.3)',
                                 }}
-                                title={`${h.uptime_pct.toFixed(1)}% — ${h.target_met ? 'Met' : 'Missed'}`}
+                                title={`Maker: ${h.maker_uptime_pct.toFixed(1)}% | MM: ${h.mm_uptime_pct.toFixed(1)}% — ${h.maker_target_met ? 'Met' : 'Missed'}`}
                             />
                         ))}
                     </div>

@@ -21,6 +21,7 @@ export interface BotState {
     consecutive_failures: number;
     uptime: UptimeStats;
     uptime_percentage: number;
+    mm_uptime_percentage: number;
 }
 
 export interface Order {
@@ -49,23 +50,28 @@ export interface Quote {
 
 export interface UptimeStats {
     current_hour: {
-        total_active_seconds: number;
+        maker_active_seconds: number;
+        mm_active_seconds: number;
         total_elapsed_seconds: number;
-        uptime_pct: number;
+        maker_uptime_pct: number;
+        mm_uptime_pct: number;
         target_seconds: number;
-        target_met: boolean;
+        maker_target_met: boolean;
         seconds_remaining_for_target: number;
         seconds_elapsed_in_hour: number;
         is_active: boolean;
     };
     history: Array<{
         hour_start: number;
-        total_active_seconds: number;
-        uptime_pct: number;
-        target_met: boolean;
+        maker_active_seconds: number;
+        mm_active_seconds: number;
+        maker_uptime_pct: number;
+        mm_uptime_pct: number;
+        maker_target_met: boolean;
     }>;
     hours_target_met_last_24h: number;
-    avg_uptime_pct_last_24h: number;
+    avg_maker_uptime_pct_last_24h: number;
+    avg_mm_uptime_pct_last_24h: number;
 }
 
 const INITIAL_STATE: BotState = {
@@ -89,20 +95,24 @@ const INITIAL_STATE: BotState = {
     consecutive_failures: 0,
     uptime: {
         current_hour: {
-            total_active_seconds: 0,
+            maker_active_seconds: 0,
+            mm_active_seconds: 0,
             total_elapsed_seconds: 0,
-            uptime_pct: 0,
+            maker_uptime_pct: 0,
+            mm_uptime_pct: 0,
             target_seconds: 1800,
-            target_met: false,
+            maker_target_met: false,
             seconds_remaining_for_target: 1800,
             seconds_elapsed_in_hour: 0,
             is_active: false,
         },
         history: [],
         hours_target_met_last_24h: 0,
-        avg_uptime_pct_last_24h: 0,
+        avg_maker_uptime_pct_last_24h: 0,
+        avg_mm_uptime_pct_last_24h: 0,
     },
     uptime_percentage: 0,
+    mm_uptime_percentage: 0,
 };
 
 export function useWebSocket(url: string) {

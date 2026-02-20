@@ -1,12 +1,18 @@
 """
-Maker uptime tracker.
+Dual uptime tracker — maker vs market-maker.
 
-Tracks per-hour maker uptime to ensure the bot maintains
-at least 30 minutes of active quoting per hour (StandX eligibility).
+Two independent counters per hour:
+  • maker_uptime   — counted only when configured spread ≤ 5 bps
+                     (StandX maker eligibility)
+  • mm_uptime      — counted when spread > 5 bps
+                     (wider market-making, not eligible)
 
-- tick(has_both_sides) is called every engine loop iteration.
-- Automatically resets every hour.
-- Stores history for the last 24 hours.
+tick() is called every engine loop with:
+  - has_both_sides: whether bid+ask are both on the book
+  - spread_bps: the configured spread at that moment
+
+Automatically resets on the hour boundary.
+Stores history for the last 24 hours.
 """
 
 from __future__ import annotations
@@ -21,44 +27,52 @@ from app.logger import get_logger
 
 log = get_logger("uptime")
 
+# Spread threshold — at or below this, time counts as "maker"
+MAKER_MAX_SPREAD_BPS = 5.0
+
 
 @dataclass
 class HourlyRecord:
-    """Record for a single hour."""
+    """Record for a single hour with dual counters."""
     hour_start: float
-    total_active_seconds: float = 0.0
+    maker_active_seconds: float = 0.0     # spread ≤ 5 bps
+    mm_active_seconds: float = 0.0        # spread > 5 bps
     total_elapsed_seconds: float = 0.0
-    target_seconds: float = 1800.0  # 30 minutes
+    target_seconds: float = 1800.0        # 30 minutes
 
     @property
-    def uptime_pct(self) -> float:
-        """Percentage of the hour with active quoting."""
-        if self.total_elapsed_seconds == 0:
-            return 0.0
-        return min(self.total_active_seconds / 3600.0 * 100.0, 100.0)
+    def maker_uptime_pct(self) -> float:
+        """Maker uptime as percentage of the full hour (3600s)."""
+        return min(self.maker_active_seconds / 3600.0 * 100.0, 100.0)
 
     @property
-    def target_met(self) -> bool:
-        """Whether the uptime target is met."""
-        return self.total_active_seconds >= self.target_seconds
+    def mm_uptime_pct(self) -> float:
+        """Market-maker uptime as percentage of the full hour."""
+        return min(self.mm_active_seconds / 3600.0 * 100.0, 100.0)
+
+    @property
+    def maker_target_met(self) -> bool:
+        return self.maker_active_seconds >= self.target_seconds
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "hour_start": self.hour_start,
-            "total_active_seconds": round(self.total_active_seconds, 2),
+            "maker_active_seconds": round(self.maker_active_seconds, 2),
+            "mm_active_seconds": round(self.mm_active_seconds, 2),
             "total_elapsed_seconds": round(self.total_elapsed_seconds, 2),
-            "uptime_pct": round(self.uptime_pct, 2),
+            "maker_uptime_pct": round(self.maker_uptime_pct, 2),
+            "mm_uptime_pct": round(self.mm_uptime_pct, 2),
             "target_seconds": self.target_seconds,
-            "target_met": self.target_met,
+            "maker_target_met": self.maker_target_met,
         }
 
 
 class UptimeTracker:
     """
-    Tracks maker uptime per hour.
+    Tracks dual uptime per hour.
 
-    The bot is considered 'active' when it has BOTH bid and ask
-    orders placed within the allowed spread deviation.
+    maker_uptime — both sides active AND spread ≤ 5 bps
+    mm_uptime    — both sides active AND spread > 5 bps
     """
 
     def __init__(self) -> None:
@@ -90,15 +104,20 @@ class UptimeTracker:
         now = time.time()
         return now - (now % 3600)
 
-    def tick(self, has_both_sides: bool) -> None:
+    def tick(self, has_both_sides: bool, spread_bps: float = 0.0) -> None:
         """
         Called every engine loop iteration.
 
         Args:
             has_both_sides: True if bot has both bid and ask orders active.
+            spread_bps: The configured spread at this moment.
         """
         now = time.time()
         elapsed = now - self._last_tick
+
+        # Cap elapsed to prevent huge jumps (e.g. after sleep/suspend)
+        elapsed = min(elapsed, 10.0)
+
         self._last_tick = now
 
         # Check for hour rollover
@@ -108,10 +127,15 @@ class UptimeTracker:
 
         # Update current record
         self._current_record.total_elapsed_seconds += elapsed
+
         if has_both_sides:
-            self._current_record.total_active_seconds += elapsed
+            if spread_bps <= MAKER_MAX_SPREAD_BPS:
+                self._current_record.maker_active_seconds += elapsed
+            else:
+                self._current_record.mm_active_seconds += elapsed
+
             if not self._is_active:
-                log.info("uptime.became_active")
+                log.info("uptime.became_active", spread_bps=spread_bps)
                 self._is_active = True
         else:
             if self._is_active:
@@ -123,9 +147,11 @@ class UptimeTracker:
         log.info(
             "uptime.hour_rollover",
             hour=self._current_hour,
-            active_seconds=self._current_record.total_active_seconds,
-            uptime_pct=self._current_record.uptime_pct,
-            target_met=self._current_record.target_met,
+            maker_seconds=self._current_record.maker_active_seconds,
+            mm_seconds=self._current_record.mm_active_seconds,
+            maker_pct=self._current_record.maker_uptime_pct,
+            mm_pct=self._current_record.mm_uptime_pct,
+            maker_target_met=self._current_record.maker_target_met,
         )
         self._history.append(self._current_record)
         self._current_hour = new_hour
@@ -135,24 +161,24 @@ class UptimeTracker:
         )
 
     @property
-    def current_uptime_pct(self) -> float:
-        """Current hour uptime percentage."""
-        return self._current_record.uptime_pct
+    def current_maker_uptime_pct(self) -> float:
+        return self._current_record.maker_uptime_pct
 
     @property
-    def is_target_met(self) -> bool:
-        """Whether the current hour target is met."""
-        return self._current_record.target_met
+    def current_mm_uptime_pct(self) -> float:
+        return self._current_record.mm_uptime_pct
+
+    @property
+    def is_maker_target_met(self) -> bool:
+        return self._current_record.maker_target_met
 
     @property
     def seconds_remaining_for_target(self) -> float:
-        """Seconds of active quoting still needed to meet target."""
-        remaining = self._target_seconds - self._current_record.total_active_seconds
+        remaining = self._target_seconds - self._current_record.maker_active_seconds
         return max(remaining, 0.0)
 
     @property
     def seconds_elapsed_in_hour(self) -> float:
-        """Seconds elapsed in the current hour."""
         return time.time() - self._current_hour
 
     def get_stats(self) -> dict[str, Any]:
@@ -166,10 +192,16 @@ class UptimeTracker:
             },
             "history": [r.to_dict() for r in self._history],
             "hours_target_met_last_24h": sum(
-                1 for r in self._history if r.target_met
+                1 for r in self._history if r.maker_target_met
             ),
-            "avg_uptime_pct_last_24h": round(
-                sum(r.uptime_pct for r in self._history) / len(self._history)
+            "avg_maker_uptime_pct_last_24h": round(
+                sum(r.maker_uptime_pct for r in self._history) / len(self._history)
+                if self._history
+                else 0.0,
+                2,
+            ),
+            "avg_mm_uptime_pct_last_24h": round(
+                sum(r.mm_uptime_pct for r in self._history) / len(self._history)
                 if self._history
                 else 0.0,
                 2,
