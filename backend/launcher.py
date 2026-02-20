@@ -103,15 +103,15 @@ class LauncherApp:
     def __init__(self) -> None:
         self.root = tk.Tk()
         self.root.title("MakerBot — StandX Market Maker")
-        self.root.geometry("520x420")
+        self.root.geometry("560x500")
         self.root.resizable(False, False)
         self.root.configure(bg="#0f172a")
 
         # Try to center on screen
         self.root.update_idletasks()
-        x = (self.root.winfo_screenwidth() - 520) // 2
-        y = (self.root.winfo_screenheight() - 420) // 2
-        self.root.geometry(f"520x420+{x}+{y}")
+        x = (self.root.winfo_screenwidth() - 560) // 2
+        y = (self.root.winfo_screenheight() - 500) // 2
+        self.root.geometry(f"560x500+{x}+{y}")
 
         self._build_ui()
         self._load_existing()
@@ -157,7 +157,7 @@ class LauncherApp:
         self.start_btn = tk.Button(
             btn_frame,
             text="🚀  Start Bot",
-            font=("Segoe UI", 13, "bold"),
+            font=("Segoe UI", 14, "bold"),
             bg="#10b981",
             fg="white",
             activebackground="#059669",
@@ -165,9 +165,9 @@ class LauncherApp:
             relief="flat",
             cursor="hand2",
             command=self._on_start,
-            height=2,
+            pady=14,
         )
-        self.start_btn.pack(fill="x")
+        self.start_btn.pack(fill="x", ipady=6)
 
     def _add_field(self, parent: ttk.Frame, label: str, var: tk.StringVar,
                    row: int, show: str = "") -> None:
