@@ -1,6 +1,6 @@
 # Market Maker Bot
 
-Uptime-optimized market-making bot for **StandX Perps** with a real-time web dashboard. Places symmetric limit orders around mid price to maintain continuous two-sided quoting.
+Uptime-optimized market-making bot with a real-time web dashboard. Places symmetric limit orders around mid price to maintain continuous two-sided quoting.
 
 > **This system runs entirely on your local machine. No cloud deployment, no public URLs.**
 
