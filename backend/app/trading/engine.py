@@ -403,9 +403,12 @@ class TradingEngine:
             log.info("engine.order_cancelled", exchange_id=exchange_order_id)
             return True
         except httpx.HTTPStatusError as e:
-            if e.response.status_code == 404:
-                log.info("engine.order_already_gone", exchange_id=exchange_order_id)
-                return True  # Already gone = success
+            if e.response.status_code in (404, 422):
+                # 404 = not found, 422 = already filled/cancelled — both mean "gone"
+                log.info("engine.order_already_gone",
+                         exchange_id=exchange_order_id,
+                         status=e.response.status_code)
+                return True
             log.error("engine.cancel_failed",
                       exchange_id=exchange_order_id,
                       status=e.response.status_code,
@@ -420,39 +423,43 @@ class TradingEngine:
         
         Queries the exchange for actual open orders and cancels each
         using the integer order ID from the exchange.
+        Never raises — cancel failures are logged but do not propagate.
         """
         cancelled = 0
         failed = 0
 
-        # 1. Query exchange for real open orders
         try:
-            headers = await auth_manager.get_full_headers("")
-            resp = await self._client.get(
-                "/api/query_open_orders",
-                params={"symbol": settings.symbol},
-                headers=headers,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            exchange_orders = data.get("result", [])
-            log.info("engine.fetched_open_orders", count=len(exchange_orders))
+            # 1. Query exchange for real open orders
+            try:
+                headers = await auth_manager.get_full_headers("")
+                resp = await self._client.get(
+                    "/api/query_open_orders",
+                    params={"symbol": settings.symbol},
+                    headers=headers,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                exchange_orders = data.get("result", [])
+                log.info("engine.fetched_open_orders", count=len(exchange_orders))
+            except Exception as e:
+                log.error("engine.fetch_open_orders_failed", error=str(e))
+                exchange_orders = []
+
+            # 2. Cancel each order using integer ID
+            for order in exchange_orders:
+                exchange_id = order.get("id")
+                if exchange_id is not None:
+                    ok = await self._cancel_order_by_id(exchange_id)
+                    if ok:
+                        cancelled += 1
+                    else:
+                        failed += 1
+
+            log.info("engine.cancel_all_done", cancelled=cancelled, failed=failed)
         except Exception as e:
-            log.error("engine.fetch_open_orders_failed", error=str(e))
-            exchange_orders = []
+            log.error("engine.cancel_all_error", error=str(e))
 
-        # 2. Cancel each order using integer ID
-        for order in exchange_orders:
-            exchange_id = order.get("id")
-            if exchange_id is not None:
-                ok = await self._cancel_order_by_id(exchange_id)
-                if ok:
-                    cancelled += 1
-                else:
-                    failed += 1
-
-        log.info("engine.cancel_all_done", cancelled=cancelled, failed=failed)
-
-        # 3. Clear all internal order tracking
+        # 3. Always clear internal order tracking, even if cancels failed
         self._active_orders.clear()
         log.info("engine.orders_cleared")
 

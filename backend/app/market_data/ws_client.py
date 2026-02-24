@@ -197,9 +197,9 @@ class MarketDataClient:
         # auth response
         elif channel == "auth":
             auth_data = data.get("data", {})
-            code = auth_data.get("code", 0)
+            code = auth_data.get("code", -1)
             msg = auth_data.get("msg", "")
-            if code == 200:
+            if code in (0, 200):
                 log.info("ws_client.auth_success")
             else:
                 log.error("ws_client.auth_failed", code=code, msg=msg)
