@@ -46,6 +46,8 @@ export default function Dashboard() {
                         currentBidNotional={state.bid_notional}
                         currentAskNotional={state.ask_notional}
                         currentRequoteBps={state.requote_threshold_bps}
+                        currentTpBps={state.tp_bps}
+                        currentSlBps={state.sl_bps}
                         botStatus={state.status}
                     />
                 </div>

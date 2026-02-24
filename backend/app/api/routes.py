@@ -58,6 +58,8 @@ class ConfigUpdate(BaseModel):
     ask_notional: Optional[float] = None
     requote_threshold_bps: Optional[float] = None
     refresh_interval: Optional[float] = None
+    tp_bps: Optional[float] = None
+    sl_bps: Optional[float] = None
 
 
 # --- Start / Stop ---
@@ -177,6 +179,8 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
                 ask_notional=config.ask_notional,
                 requote_threshold_bps=config.requote_threshold_bps,
                 refresh_interval=config.refresh_interval,
+                tp_bps=config.tp_bps,
+                sl_bps=config.sl_bps,
             )
 
             # 5. Restart engine if it was running
@@ -194,6 +198,8 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
                 ask_notional=config.ask_notional,
                 requote_threshold_bps=config.requote_threshold_bps,
                 refresh_interval=config.refresh_interval,
+                tp_bps=config.tp_bps,
+                sl_bps=config.sl_bps,
             )
             if not updates:
                 raise HTTPException(status_code=400, detail="No valid fields to update")
@@ -216,5 +222,7 @@ async def update_config(config: ConfigUpdate) -> dict[str, Any]:
             "ask_notional": settings.ask_notional,
             "requote_threshold_bps": settings.requote_threshold_bps,
             "refresh_interval": settings.refresh_interval,
+            "tp_bps": settings.tp_bps,
+            "sl_bps": settings.sl_bps,
         },
     }

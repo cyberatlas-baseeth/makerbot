@@ -14,6 +14,8 @@ export interface BotState {
     bid_spread_bps: number;
     ask_spread_bps: number;
     refresh_interval: number;
+    tp_bps: number;
+    sl_bps: number;
     active_orders: Order[];
     active_order_count: number;
     last_quote: Quote | null;
@@ -88,6 +90,8 @@ const INITIAL_STATE: BotState = {
     bid_spread_bps: 0,
     ask_spread_bps: 0,
     refresh_interval: 0,
+    tp_bps: 0,
+    sl_bps: 0,
     active_orders: [],
     active_order_count: 0,
     last_quote: null,

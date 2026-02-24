@@ -81,6 +81,10 @@ class Settings(BaseSettings):
     # Uptime
     uptime_target_minutes: int = Field(default=30)
 
+    # Take Profit / Stop Loss (bps from entry price, 0 = disabled)
+    tp_bps: float = Field(default=0.0)
+    sl_bps: float = Field(default=0.0)
+
     # Engine safety
     max_consecutive_failures: int = Field(default=5)
     stale_order_seconds: float = Field(default=30.0)
@@ -98,6 +102,8 @@ def update_runtime_settings(
     requote_threshold_bps: float | None = None,
     refresh_interval: float | None = None,
     symbol: str | None = None,
+    tp_bps: float | None = None,
+    sl_bps: float | None = None,
 ) -> dict[str, Any]:
     """Update runtime-modifiable settings. Returns updated values."""
     global settings
@@ -122,4 +128,10 @@ def update_runtime_settings(
     if refresh_interval is not None:
         settings.refresh_interval = refresh_interval
         updates["refresh_interval"] = refresh_interval
+    if tp_bps is not None:
+        settings.tp_bps = tp_bps
+        updates["tp_bps"] = tp_bps
+    if sl_bps is not None:
+        settings.sl_bps = sl_bps
+        updates["sl_bps"] = sl_bps
     return updates

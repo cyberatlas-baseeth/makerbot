@@ -166,6 +166,8 @@ class TradingEngine:
             "bid_spread_bps": quote_dict.get("bid_spread_bps", settings.spread_bps),
             "ask_spread_bps": quote_dict.get("ask_spread_bps", settings.spread_bps),
             "refresh_interval": settings.refresh_interval,
+            "tp_bps": settings.tp_bps,
+            "sl_bps": settings.sl_bps,
             "active_orders": self.active_orders,
             "active_order_count": len([o for o in self._active_orders.values() if o.status == "open"]),
             "last_quote": self.last_quote,
@@ -350,6 +352,23 @@ class TradingEngine:
             "time_in_force": "gtc",
             "reduce_only": False,
         }
+
+        # TP/SL — compute absolute prices from bps (0 = disabled)
+        if settings.tp_bps > 0:
+            if side == "buy":
+                tp_price = rounded_price * (1 + settings.tp_bps / 10000.0)
+            else:
+                tp_price = rounded_price * (1 - settings.tp_bps / 10000.0)
+            tp_price = round(tp_price, price_decimals)
+            payload["tp_price"] = str(tp_price)
+
+        if settings.sl_bps > 0:
+            if side == "buy":
+                sl_price = rounded_price * (1 - settings.sl_bps / 10000.0)
+            else:
+                sl_price = rounded_price * (1 + settings.sl_bps / 10000.0)
+            sl_price = round(sl_price, price_decimals)
+            payload["sl_price"] = str(sl_price)
         payload_str = json.dumps(payload)
         headers = await auth_manager.get_full_headers(payload_str)
         headers["Content-Type"] = "application/json"

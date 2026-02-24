@@ -9,6 +9,8 @@ interface ControlPanelProps {
     currentBidNotional: number;
     currentAskNotional: number;
     currentRequoteBps: number;
+    currentTpBps: number;
+    currentSlBps: number;
     botStatus: string;
 }
 
@@ -18,6 +20,8 @@ export default function ControlPanel({
     currentBidNotional,
     currentAskNotional,
     currentRequoteBps,
+    currentTpBps,
+    currentSlBps,
     botStatus,
 }: ControlPanelProps) {
     const [selectedSymbol, setSelectedSymbol] = useState('');
@@ -25,6 +29,8 @@ export default function ControlPanel({
     const [bidNotional, setBidNotional] = useState('');
     const [askNotional, setAskNotional] = useState('');
     const [requoteBps, setRequoteBps] = useState('');
+    const [tpBps, setTpBps] = useState('');
+    const [slBps, setSlBps] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
 
@@ -73,6 +79,8 @@ export default function ControlPanel({
             if (bidNotional) config.bid_notional = parseFloat(bidNotional);
             if (askNotional) config.ask_notional = parseFloat(askNotional);
             if (requoteBps) config.requote_threshold_bps = parseFloat(requoteBps);
+            if (tpBps) config.tp_bps = parseFloat(tpBps);
+            if (slBps) config.sl_bps = parseFloat(slBps);
 
             if (Object.keys(config).length === 0) {
                 showMessage('NO CHANGES');
@@ -86,6 +94,8 @@ export default function ControlPanel({
             setBidNotional('');
             setAskNotional('');
             setRequoteBps('');
+            setTpBps('');
+            setSlBps('');
             if (config.symbol) setSelectedSymbol('');
         } catch (err: any) {
             showMessage(`ERROR: ${err.message || 'Failed'}`);
@@ -184,6 +194,40 @@ export default function ControlPanel({
                         placeholder={currentAskNotional.toString()}
                         value={askNotional}
                         onChange={(e) => setAskNotional(e.target.value)}
+                        disabled={loading}
+                    />
+                </div>
+            </div>
+
+            {/* TP / SL */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+                <div>
+                    <label className="metric-label" style={{ display: 'block', marginBottom: '4px', opacity: 1, color: 'rgba(0,0,0,0.6)' }}>
+                        TP BPS
+                    </label>
+                    <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        className="input-brutal"
+                        placeholder={currentTpBps.toString()}
+                        value={tpBps}
+                        onChange={(e) => setTpBps(e.target.value)}
+                        disabled={loading}
+                    />
+                </div>
+                <div>
+                    <label className="metric-label" style={{ display: 'block', marginBottom: '4px', opacity: 1, color: 'rgba(0,0,0,0.6)' }}>
+                        SL BPS
+                    </label>
+                    <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        className="input-brutal"
+                        placeholder={currentSlBps.toString()}
+                        value={slBps}
+                        onChange={(e) => setSlBps(e.target.value)}
                         disabled={loading}
                     />
                 </div>
