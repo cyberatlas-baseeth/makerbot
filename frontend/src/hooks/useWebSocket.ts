@@ -16,6 +16,8 @@ export interface BotState {
     refresh_interval: number;
     tp_bps: number;
     sl_bps: number;
+    auto_close_fills: boolean;
+    open_position: { side: string; qty: number; entry_price: number } | null;
     active_orders: Order[];
     active_order_count: number;
     last_quote: Quote | null;
@@ -92,6 +94,8 @@ const INITIAL_STATE: BotState = {
     refresh_interval: 0,
     tp_bps: 0,
     sl_bps: 0,
+    auto_close_fills: true,
+    open_position: null,
     active_orders: [],
     active_order_count: 0,
     last_quote: null,

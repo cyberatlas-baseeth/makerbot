@@ -76,6 +76,26 @@ export default function Dashboard() {
                         askSpreadBps={state.ask_spread_bps || state.configured_spread_bps}
                     />
 
+                    {/* Open Position Alert */}
+                    {state.open_position && (
+                        <div style={{
+                            marginTop: '12px',
+                            padding: '10px 14px',
+                            background: state.open_position.side === 'long' ? '#1a3a1a' : '#3a1a1a',
+                            border: `2px solid ${state.open_position.side === 'long' ? '#22c55e' : '#ef4444'}`,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                        }}>
+                            <span style={{ color: state.open_position.side === 'long' ? '#22c55e' : '#ef4444', fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: '12px', letterSpacing: '0.05em' }}>
+                                ⚠ OPEN {state.open_position.side.toUpperCase()} POSITION
+                            </span>
+                            <span style={{ color: '#E6E4D8', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
+                                {state.open_position.qty} @ ${state.open_position.entry_price.toLocaleString()}
+                            </span>
+                        </div>
+                    )}
+
                     {/* Uptime */}
                     <div style={{ marginTop: '20px' }}>
                         <UptimeBar uptime={state.uptime} />

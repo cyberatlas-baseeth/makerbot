@@ -87,6 +87,7 @@ class TradingEngine:
         self._task: asyncio.Task[None] | None = None
         self._last_quote: Quote | None = None
         self._loop_count = 0
+        self._open_position: dict | None = None  # {side, qty, entry_price}
         self._lock = asyncio.Lock()
         self._client = httpx.AsyncClient(
             base_url=settings.standx_api_base,
@@ -168,6 +169,8 @@ class TradingEngine:
             "refresh_interval": settings.refresh_interval,
             "tp_bps": settings.tp_bps,
             "sl_bps": settings.sl_bps,
+            "auto_close_fills": settings.auto_close_fills,
+            "open_position": self._open_position,
             "active_orders": self.active_orders,
             "active_order_count": len([o for o in self._active_orders.values() if o.status == "open"]),
             "last_quote": self.last_quote,
@@ -210,6 +213,10 @@ class TradingEngine:
     async def _tick(self) -> None:
         """Single iteration of the trading loop."""
         self._loop_count += 1
+
+        # 0. Check and close any open positions from partial fills
+        if settings.auto_close_fills:
+            await self._check_and_close_positions()
 
         # 1. Get mid price
         mid = self._orderbook.mid_price
@@ -481,6 +488,107 @@ class TradingEngine:
         # 3. Always clear internal order tracking, even if cancels failed
         self._active_orders.clear()
         log.info("engine.orders_cleared")
+
+    # ─── Position Management ───────────────────────────────────────
+
+    async def _check_and_close_positions(self) -> None:
+        """Query open positions and close them with reduce_only market orders."""
+        try:
+            headers = await auth_manager.get_full_headers("")
+            resp = await self._client.get(
+                "/api/query_positions",
+                params={"symbol": settings.symbol},
+                headers=headers,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            positions = data.get("result", [])
+
+            # Find non-zero position for our symbol
+            active_pos = None
+            for pos in positions:
+                qty = float(pos.get("qty", 0))
+                if pos.get("symbol") == settings.symbol and qty != 0:
+                    active_pos = pos
+                    break
+
+            if active_pos is None:
+                self._open_position = None
+                return
+
+            qty = float(active_pos.get("qty", 0))
+            entry_price = float(active_pos.get("entry_price", 0))
+            pos_side = "long" if qty > 0 else "short"
+
+            self._open_position = {
+                "side": pos_side,
+                "qty": abs(qty),
+                "entry_price": entry_price,
+            }
+
+            log.warning(
+                "engine.position_detected",
+                side=pos_side,
+                qty=abs(qty),
+                entry_price=entry_price,
+            )
+
+            # Close: sell to close long, buy to close short
+            close_side = "sell" if qty > 0 else "buy"
+            await self._place_market_close(close_side, abs(qty))
+
+        except Exception as e:
+            log.error("engine.position_check_error", error=str(e))
+
+    async def _place_market_close(self, side: str, qty: float) -> None:
+        """Place a reduce_only market order to close a position."""
+        # Round qty to symbol's tick size
+        tick = QTY_TICKS.get(settings.symbol, 0.0001)
+        decimals = max(0, -int(math.log10(tick)))
+        rounded_qty = round(qty, decimals)
+
+        if rounded_qty < tick:
+            log.info("engine.position_too_small", qty=qty, tick=tick)
+            self._open_position = None
+            return
+
+        payload = {
+            "symbol": settings.symbol,
+            "side": side,
+            "order_type": "market",
+            "qty": str(rounded_qty),
+            "time_in_force": "ioc",
+            "reduce_only": True,
+        }
+
+        payload_str = json.dumps(payload)
+        headers = await auth_manager.get_full_headers(payload_str)
+        headers["Content-Type"] = "application/json"
+
+        try:
+            resp = await self._client.post(
+                "/api/new_order",
+                content=payload_str,
+                headers=headers,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            order_id = data.get("order_id", data.get("id", "unknown"))
+            log.info(
+                "engine.position_closed",
+                order_id=order_id,
+                side=side,
+                qty=rounded_qty,
+            )
+            self._open_position = None
+        except httpx.HTTPStatusError as e:
+            log.error(
+                "engine.position_close_failed",
+                status=e.response.status_code,
+                body=e.response.text[:200],
+            )
+        except Exception as e:
+            log.error("engine.position_close_error", error=str(e))
 
     async def close(self) -> None:
         """Cleanup resources."""

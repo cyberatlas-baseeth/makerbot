@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     tp_bps: float = Field(default=0.0)
     sl_bps: float = Field(default=0.0)
 
+    # Auto-close partial-fill positions (reduce_only market order)
+    auto_close_fills: bool = Field(default=True)
+
     # Engine safety
     max_consecutive_failures: int = Field(default=5)
     stale_order_seconds: float = Field(default=30.0)
