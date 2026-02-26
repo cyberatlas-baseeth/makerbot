@@ -504,22 +504,38 @@ class TradingEngine:
             )
             resp.raise_for_status()
             data = resp.json()
-            positions = data.get("result", [])
+
+            # Handle both {result: [...]} and direct list response
+            if isinstance(data, list):
+                positions = data
+            else:
+                positions = data.get("result", data.get("data", []))
+
+            log.info(
+                "engine.position_query",
+                count=len(positions),
+                raw_keys=list(data.keys()) if isinstance(data, dict) else "list",
+            )
 
             # Find non-zero position for our symbol
             active_pos = None
             for pos in positions:
-                qty = float(pos.get("qty", 0))
-                if pos.get("symbol") == settings.symbol and qty != 0:
+                # Try multiple field names for qty
+                qty_raw = pos.get("qty", pos.get("size", pos.get("position_qty", 0)))
+                qty = float(qty_raw)
+                pos_symbol = pos.get("symbol", pos.get("instrument", ""))
+                if pos_symbol == settings.symbol and qty != 0:
                     active_pos = pos
+                    log.info("engine.position_found", raw_pos=str(pos)[:300])
                     break
 
             if active_pos is None:
                 self._open_position = None
                 return
 
-            qty = float(active_pos.get("qty", 0))
-            entry_price = float(active_pos.get("entry_price", 0))
+            qty_raw = active_pos.get("qty", active_pos.get("size", active_pos.get("position_qty", 0)))
+            qty = float(qty_raw)
+            entry_price = float(active_pos.get("entry_price", active_pos.get("avg_entry_price", 0)))
             pos_side = "long" if qty > 0 else "short"
 
             self._open_position = {
