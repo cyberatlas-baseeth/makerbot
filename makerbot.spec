@@ -106,7 +106,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='makerbot-v2.0.1',
+    name='makerbot-v2.0.2',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
