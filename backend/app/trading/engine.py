@@ -88,6 +88,7 @@ class TradingEngine:
         self._last_quote: Quote | None = None
         self._loop_count = 0
         self._open_position: dict | None = None  # {side, qty, entry_price}
+        self._closed_positions: list[dict] = []    # recent auto-closed positions
         self._lock = asyncio.Lock()
         self._client = httpx.AsyncClient(
             base_url=settings.standx_api_base,
@@ -171,6 +172,7 @@ class TradingEngine:
             "sl_bps": settings.sl_bps,
             "auto_close_fills": settings.auto_close_fills,
             "open_position": self._open_position,
+            "closed_positions": self._closed_positions[-20:],
             "active_orders": self.active_orders,
             "active_order_count": len([o for o in self._active_orders.values() if o.status == "open"]),
             "last_quote": self.last_quote,
@@ -580,6 +582,19 @@ class TradingEngine:
                 side=side,
                 qty=rounded_qty,
             )
+            # Record in closed positions history
+            if self._open_position:
+                self._closed_positions.append({
+                    "side": self._open_position["side"],
+                    "qty": self._open_position["qty"],
+                    "entry_price": self._open_position["entry_price"],
+                    "close_side": side,
+                    "close_qty": rounded_qty,
+                    "closed_at": time.time(),
+                })
+                # Keep only last 50
+                if len(self._closed_positions) > 50:
+                    self._closed_positions = self._closed_positions[-50:]
             self._open_position = None
         except httpx.HTTPStatusError as e:
             log.error(

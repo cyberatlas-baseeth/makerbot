@@ -18,6 +18,7 @@ export interface BotState {
     sl_bps: number;
     auto_close_fills: boolean;
     open_position: { side: string; qty: number; entry_price: number } | null;
+    closed_positions: ClosedPosition[];
     active_orders: Order[];
     active_order_count: number;
     last_quote: Quote | null;
@@ -36,6 +37,15 @@ export interface Order {
     placed_at: number;
     status: string;
     age_seconds: number;
+}
+
+export interface ClosedPosition {
+    side: string;
+    qty: number;
+    entry_price: number;
+    close_side: string;
+    close_qty: number;
+    closed_at: number;
 }
 
 export interface Quote {
@@ -96,6 +106,7 @@ const INITIAL_STATE: BotState = {
     sl_bps: 0,
     auto_close_fills: true,
     open_position: null,
+    closed_positions: [],
     active_orders: [],
     active_order_count: 0,
     last_quote: null,

@@ -98,7 +98,7 @@ export default function Dashboard() {
 
                     {/* Uptime */}
                     <div style={{ marginTop: '20px' }}>
-                        <UptimeBar uptime={state.uptime} />
+                        <UptimeBar uptime={state.uptime} closedPositions={state.closed_positions} />
                     </div>
 
                     {/* Orders Table */}
@@ -193,7 +193,7 @@ export default function Dashboard() {
                     <div style={{ marginTop: 'auto', paddingTop: '24px' }}>
                         <hr className="divider" style={{ borderColor: 'rgba(230,228,216,0.2)' }} />
                         <div style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(230,228,216,0.4)' }}>
-                            MAKERBOT V2.0.0
+                            MAKERBOT V2.0.1
                         </div>
                     </div>
                 </div>

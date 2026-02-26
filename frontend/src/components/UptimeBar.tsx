@@ -1,7 +1,8 @@
-import type { UptimeStats } from '../hooks/useWebSocket';
+import type { UptimeStats, ClosedPosition } from '../hooks/useWebSocket';
 
 interface UptimeBarProps {
     uptime: UptimeStats;
+    closedPositions: ClosedPosition[];
 }
 
 function fmtTime(seconds: number): string {
@@ -10,8 +11,15 @@ function fmtTime(seconds: number): string {
     return `${m}m ${s}s`;
 }
 
-export default function UptimeBar({ uptime }: UptimeBarProps) {
-    const { current_hour, history } = uptime;
+function fmtAgo(timestamp: number): string {
+    const diff = Math.floor(Date.now() / 1000 - timestamp);
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    return `${Math.floor(diff / 3600)}h ago`;
+}
+
+export default function UptimeBar({ uptime, closedPositions }: UptimeBarProps) {
+    const { current_hour } = uptime;
     const makerPct = current_hour.maker_uptime_pct;
     const mmPct = current_hour.mm_uptime_pct;
     const targetPct = (current_hour.target_seconds / 3600) * 100;
@@ -79,38 +87,36 @@ export default function UptimeBar({ uptime }: UptimeBarProps) {
                 </div>
             </div>
 
-            {/* 24h History */}
-            {history.length > 0 && (
+            {/* Closed Positions */}
+            {closedPositions.length > 0 && (
                 <div>
-                    <div className="metric-label" style={{ marginBottom: '8px', opacity: 1 }}>24H HISTORY</div>
-                    <div style={{ display: 'flex', gap: '2px', height: '32px', alignItems: 'flex-end' }}>
-                        {history.slice(-24).map((h, i) => {
-                            const totalPct = h.maker_uptime_pct + h.mm_uptime_pct;
-                            const height = Math.max(totalPct, 3);
-                            const bgColor = h.maker_target_met ? '#0F2F3A' : '#D65A00';
-                            const hour = new Date(h.hour_start * 1000);
-                            const label = `${hour.getHours().toString().padStart(2, '0')}:00 — Maker: ${h.maker_uptime_pct.toFixed(1)}% / MM: ${h.mm_uptime_pct.toFixed(1)}%`;
-
-                            return (
-                                <div
-                                    key={i}
-                                    className="history-bar"
-                                    style={{
-                                        height: `${height}%`,
-                                        background: bgColor,
-                                    }}
-                                    title={label}
-                                />
-                            );
-                        })}
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-                        <span style={{ fontSize: '0.55rem', fontWeight: 500, opacity: 0.4 }}>
-                            {uptime.hours_target_met_last_24h} / {history.length} HRS TARGET MET
-                        </span>
-                        <span style={{ fontSize: '0.55rem', fontWeight: 500, opacity: 0.4 }}>
-                            AVG: {uptime.avg_maker_uptime_pct_last_24h.toFixed(1)}%
-                        </span>
+                    <div className="metric-label" style={{ marginBottom: '8px', opacity: 1 }}>CLOSED POSITIONS</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '160px', overflowY: 'auto' }}>
+                        {closedPositions.slice().reverse().map((pos, i) => (
+                            <div
+                                key={i}
+                                style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    padding: '6px 10px',
+                                    background: pos.side === 'long' ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+                                    borderLeft: `3px solid ${pos.side === 'long' ? '#22c55e' : '#ef4444'}`,
+                                    fontSize: '0.65rem',
+                                    fontFamily: 'var(--font-mono)',
+                                }}
+                            >
+                                <span style={{ color: pos.side === 'long' ? '#22c55e' : '#ef4444', fontWeight: 700 }}>
+                                    {pos.side.toUpperCase()} {pos.qty}
+                                </span>
+                                <span style={{ opacity: 0.7 }}>
+                                    @ ${pos.entry_price.toLocaleString()}
+                                </span>
+                                <span style={{ opacity: 0.4 }}>
+                                    {fmtAgo(pos.closed_at)}
+                                </span>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
