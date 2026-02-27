@@ -14,8 +14,8 @@ export interface BotState {
     bid_spread_bps: number;
     ask_spread_bps: number;
     refresh_interval: number;
-    tp_bps: number;
-    sl_bps: number;
+    tp_usd: number;
+    sl_usd: number;
     auto_close_fills: boolean;
     open_position: { side: string; qty: number; entry_price: number } | null;
     closed_positions: ClosedPosition[];
@@ -24,6 +24,7 @@ export interface BotState {
     last_quote: Quote | null;
     loop_count: number;
     consecutive_failures: number;
+    total_volume_usd: number;
     uptime: UptimeStats;
     uptime_percentage: number;
     mm_uptime_percentage: number;
@@ -102,8 +103,8 @@ const INITIAL_STATE: BotState = {
     bid_spread_bps: 0,
     ask_spread_bps: 0,
     refresh_interval: 0,
-    tp_bps: 0,
-    sl_bps: 0,
+    tp_usd: 0,
+    sl_usd: 0,
     auto_close_fills: true,
     open_position: null,
     closed_positions: [],
@@ -112,6 +113,7 @@ const INITIAL_STATE: BotState = {
     last_quote: null,
     loop_count: 0,
     consecutive_failures: 0,
+    total_volume_usd: 0,
     uptime: {
         current_hour: {
             maker_active_seconds: 0,

@@ -67,8 +67,8 @@ def write_env(jwt_token: str, private_key: str, wallet: str, chain: str) -> None
         "MAX_CONSECUTIVE_FAILURES": "5",
         "STALE_ORDER_SECONDS": "30",
         "MAX_SPREAD_DEVIATION_BPS": "200",
-        "TP_BPS": "0.0",
-        "SL_BPS": "0.0",
+        "TP_USD": "0.0",
+        "SL_USD": "0.0",
         "UPTIME_TARGET_MINUTES": "30",
     }
     for k, v in defaults.items():

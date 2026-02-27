@@ -9,8 +9,8 @@ interface ControlPanelProps {
     currentBidNotional: number;
     currentAskNotional: number;
     currentRequoteBps: number;
-    currentTpBps: number;
-    currentSlBps: number;
+    currentTpUsd: number;
+    currentSlUsd: number;
     botStatus: string;
 }
 
@@ -20,8 +20,8 @@ export default function ControlPanel({
     currentBidNotional,
     currentAskNotional,
     currentRequoteBps,
-    currentTpBps,
-    currentSlBps,
+    currentTpUsd,
+    currentSlUsd,
     botStatus,
 }: ControlPanelProps) {
     const [selectedSymbol, setSelectedSymbol] = useState('');
@@ -29,8 +29,8 @@ export default function ControlPanel({
     const [bidNotional, setBidNotional] = useState('');
     const [askNotional, setAskNotional] = useState('');
     const [requoteBps, setRequoteBps] = useState('');
-    const [tpBps, setTpBps] = useState('');
-    const [slBps, setSlBps] = useState('');
+    const [tpUsd, setTpUsd] = useState('');
+    const [slUsd, setSlUsd] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
 
@@ -79,8 +79,8 @@ export default function ControlPanel({
             if (bidNotional) config.bid_notional = parseFloat(bidNotional);
             if (askNotional) config.ask_notional = parseFloat(askNotional);
             if (requoteBps) config.requote_threshold_bps = parseFloat(requoteBps);
-            if (tpBps) config.tp_bps = parseFloat(tpBps);
-            if (slBps) config.sl_bps = parseFloat(slBps);
+            if (tpUsd) config.tp_usd = parseFloat(tpUsd);
+            if (slUsd) config.sl_usd = parseFloat(slUsd);
 
             if (Object.keys(config).length === 0) {
                 showMessage('NO CHANGES');
@@ -94,8 +94,8 @@ export default function ControlPanel({
             setBidNotional('');
             setAskNotional('');
             setRequoteBps('');
-            setTpBps('');
-            setSlBps('');
+            setTpUsd('');
+            setSlUsd('');
             if (config.symbol) setSelectedSymbol('');
         } catch (err: any) {
             showMessage(`ERROR: ${err.message || 'Failed'}`);
@@ -203,31 +203,31 @@ export default function ControlPanel({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
                 <div>
                     <label className="metric-label" style={{ display: 'block', marginBottom: '4px', opacity: 1, color: 'rgba(0,0,0,0.6)' }}>
-                        TP BPS
+                        TP $
                     </label>
                     <input
                         type="number"
-                        step="1"
+                        step="0.01"
                         min="0"
                         className="input-brutal"
-                        placeholder={currentTpBps.toString()}
-                        value={tpBps}
-                        onChange={(e) => setTpBps(e.target.value)}
+                        placeholder={currentTpUsd.toString()}
+                        value={tpUsd}
+                        onChange={(e) => setTpUsd(e.target.value)}
                         disabled={loading}
                     />
                 </div>
                 <div>
                     <label className="metric-label" style={{ display: 'block', marginBottom: '4px', opacity: 1, color: 'rgba(0,0,0,0.6)' }}>
-                        SL BPS
+                        SL $
                     </label>
                     <input
                         type="number"
-                        step="1"
+                        step="0.01"
                         min="0"
                         className="input-brutal"
-                        placeholder={currentSlBps.toString()}
-                        value={slBps}
-                        onChange={(e) => setSlBps(e.target.value)}
+                        placeholder={currentSlUsd.toString()}
+                        value={slUsd}
+                        onChange={(e) => setSlUsd(e.target.value)}
                         disabled={loading}
                     />
                 </div>

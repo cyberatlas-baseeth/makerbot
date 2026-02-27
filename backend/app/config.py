@@ -81,9 +81,9 @@ class Settings(BaseSettings):
     # Uptime
     uptime_target_minutes: int = Field(default=30)
 
-    # Take Profit / Stop Loss (bps from entry price, 0 = disabled)
-    tp_bps: float = Field(default=0.0)
-    sl_bps: float = Field(default=0.0)
+    # Take Profit / Stop Loss (USD offset from entry price, 0 = disabled)
+    tp_usd: float = Field(default=0.0)
+    sl_usd: float = Field(default=0.0)
 
     # Auto-close partial-fill positions (reduce_only market order)
     auto_close_fills: bool = Field(default=True)
@@ -105,8 +105,8 @@ def update_runtime_settings(
     requote_threshold_bps: float | None = None,
     refresh_interval: float | None = None,
     symbol: str | None = None,
-    tp_bps: float | None = None,
-    sl_bps: float | None = None,
+    tp_usd: float | None = None,
+    sl_usd: float | None = None,
 ) -> dict[str, Any]:
     """Update runtime-modifiable settings. Returns updated values."""
     global settings
@@ -131,10 +131,10 @@ def update_runtime_settings(
     if refresh_interval is not None:
         settings.refresh_interval = refresh_interval
         updates["refresh_interval"] = refresh_interval
-    if tp_bps is not None:
-        settings.tp_bps = tp_bps
-        updates["tp_bps"] = tp_bps
-    if sl_bps is not None:
-        settings.sl_bps = sl_bps
-        updates["sl_bps"] = sl_bps
+    if tp_usd is not None:
+        settings.tp_usd = tp_usd
+        updates["tp_usd"] = tp_usd
+    if sl_usd is not None:
+        settings.sl_usd = sl_usd
+        updates["sl_usd"] = sl_usd
     return updates

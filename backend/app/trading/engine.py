@@ -89,6 +89,9 @@ class TradingEngine:
         self._loop_count = 0
         self._open_position: dict | None = None  # {side, qty, entry_price}
         self._closed_positions: list[dict] = []    # recent auto-closed positions
+        self._tp_sl_order_ids: set[int] = set()    # tracked TP/SL reduce-only order IDs
+        self._total_volume_usd: float = 0.0        # all-time trade volume from API
+        self._last_volume_fetch: float = 0.0       # timestamp of last volume fetch
         self._lock = asyncio.Lock()
         self._client = httpx.AsyncClient(
             base_url=settings.standx_api_base,
@@ -115,6 +118,8 @@ class TradingEngine:
                 return
             self._status = BotStatus.RUNNING
             self._consecutive_failures = 0
+            # Fetch all-time trade volume on startup
+            await self._fetch_total_volume()
             self._task = asyncio.create_task(self._main_loop())
             log.info("engine.started")
 
@@ -168,8 +173,8 @@ class TradingEngine:
             "bid_spread_bps": quote_dict.get("bid_spread_bps", settings.spread_bps),
             "ask_spread_bps": quote_dict.get("ask_spread_bps", settings.spread_bps),
             "refresh_interval": settings.refresh_interval,
-            "tp_bps": settings.tp_bps,
-            "sl_bps": settings.sl_bps,
+            "tp_usd": settings.tp_usd,
+            "sl_usd": settings.sl_usd,
             "auto_close_fills": settings.auto_close_fills,
             "open_position": self._open_position,
             "closed_positions": self._closed_positions[-20:],
@@ -178,6 +183,7 @@ class TradingEngine:
             "last_quote": self.last_quote,
             "loop_count": self._loop_count,
             "consecutive_failures": self._consecutive_failures,
+            "total_volume_usd": round(self._total_volume_usd, 2),
             "uptime": uptime_stats,
             "uptime_percentage": uptime_stats.get("current_hour", {}).get("maker_uptime_pct", 0),
             "mm_uptime_percentage": uptime_stats.get("current_hour", {}).get("mm_uptime_pct", 0),
@@ -362,22 +368,9 @@ class TradingEngine:
             "reduce_only": False,
         }
 
-        # TP/SL — compute absolute prices from bps (0 = disabled)
-        if settings.tp_bps > 0:
-            if side == "buy":
-                tp_price = rounded_price * (1 + settings.tp_bps / 10000.0)
-            else:
-                tp_price = rounded_price * (1 - settings.tp_bps / 10000.0)
-            tp_price = round(tp_price, price_decimals)
-            payload["tp_price"] = str(tp_price)
-
-        if settings.sl_bps > 0:
-            if side == "buy":
-                sl_price = rounded_price * (1 - settings.sl_bps / 10000.0)
-            else:
-                sl_price = rounded_price * (1 + settings.sl_bps / 10000.0)
-            sl_price = round(sl_price, price_decimals)
-            payload["sl_price"] = str(sl_price)
+        # TP/SL — removed: StandX API does NOT support tp_price/sl_price
+        # TP/SL is now handled via separate reduce-only limit orders
+        # placed by _place_tp_sl_orders() when a position is detected.
         payload_str = json.dumps(payload)
         headers = await auth_manager.get_full_headers(payload_str)
         headers["Content-Type"] = "application/json"
@@ -494,7 +487,14 @@ class TradingEngine:
     # ─── Position Management ───────────────────────────────────────
 
     async def _check_and_close_positions(self) -> None:
-        """Query open positions and close them with reduce_only market orders."""
+        """Query open positions and manage TP/SL.
+
+        If TP/SL is configured (tp_usd/sl_usd > 0):
+          - Check if reduce-only orders already exist for this position
+          - If not, place TP/SL as separate reduce-only limit orders
+          - Do NOT market-close the position
+        Otherwise: close with reduce_only market orders (taker fees).
+        """
         try:
             headers = await auth_manager.get_full_headers("")
             resp = await self._client.get(
@@ -530,7 +530,12 @@ class TradingEngine:
                     break
 
             if active_pos is None:
+                # No position — clean up any stale TP/SL tracking
+                if self._open_position is not None:
+                    # Position was closed (by TP/SL or externally)
+                    log.info("engine.position_cleared")
                 self._open_position = None
+                self._tp_sl_order_ids.clear()
                 return
 
             qty_raw = active_pos.get("qty", active_pos.get("size", active_pos.get("position_qty", 0)))
@@ -544,6 +549,28 @@ class TradingEngine:
                 "entry_price": entry_price,
             }
 
+            # Check if TP/SL should be managed
+            tp_sl_active = settings.tp_usd > 0 or settings.sl_usd > 0
+            if tp_sl_active:
+                # Check if reduce-only orders already exist for this symbol
+                has_tp_sl = await self._has_existing_tp_sl_orders()
+                if not has_tp_sl:
+                    log.info(
+                        "engine.placing_tp_sl",
+                        side=pos_side,
+                        qty=abs(qty),
+                        entry_price=entry_price,
+                    )
+                    await self._place_tp_sl_orders(entry_price, abs(qty), pos_side)
+                else:
+                    log.info(
+                        "engine.tp_sl_already_exists",
+                        side=pos_side,
+                        qty=abs(qty),
+                        entry_price=entry_price,
+                    )
+                return
+
             log.warning(
                 "engine.position_detected",
                 side=pos_side,
@@ -551,12 +578,178 @@ class TradingEngine:
                 entry_price=entry_price,
             )
 
-            # Close: sell to close long, buy to close short
+            # No TP/SL configured — close with market order (fallback)
             close_side = "sell" if qty > 0 else "buy"
             await self._place_market_close(close_side, abs(qty))
 
         except Exception as e:
             log.error("engine.position_check_error", error=str(e))
+
+    async def _has_existing_tp_sl_orders(self) -> bool:
+        """Check if reduce-only orders already exist for this symbol."""
+        try:
+            headers = await auth_manager.get_full_headers("")
+            resp = await self._client.get(
+                "/api/query_open_orders",
+                params={"symbol": settings.symbol},
+                headers=headers,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            orders = data.get("result", [])
+
+            # Check if any reduce_only orders exist (these are our TP/SL)
+            for order in orders:
+                if order.get("reduce_only", False):
+                    return True
+            return False
+        except Exception as e:
+            log.error("engine.check_tp_sl_error", error=str(e))
+            return False
+
+    async def _place_tp_sl_orders(
+        self, entry_price: float, qty: float, pos_side: str
+    ) -> None:
+        """Place separate reduce-only limit orders for TP and SL.
+
+        TP/SL are placed as GTC reduce-only limit orders on the opposite side.
+        """
+        price_tick = PRICE_TICKS.get(settings.symbol, 0.01)
+        price_decimals = max(0, -int(math.log10(price_tick)))
+        tick = QTY_TICKS.get(settings.symbol, 0.0001)
+        qty_decimals = max(0, -int(math.log10(tick)))
+        rounded_qty = round(qty, qty_decimals)
+
+        if rounded_qty < tick:
+            log.info("engine.tp_sl_qty_too_small", qty=qty, tick=tick)
+            return
+
+        # Determine close side (opposite of position)
+        close_side = "sell" if pos_side == "long" else "buy"
+
+        # TP order
+        if settings.tp_usd > 0:
+            if pos_side == "long":
+                tp_price = entry_price + settings.tp_usd
+            else:
+                tp_price = entry_price - settings.tp_usd
+            # Round to price tick
+            tp_price = round(
+                math.floor(tp_price / price_tick) * price_tick
+                if close_side == "buy"
+                else math.ceil(tp_price / price_tick) * price_tick,
+                price_decimals,
+            )
+            await self._place_reduce_only_limit(
+                close_side, tp_price, rounded_qty, "tp"
+            )
+
+        # SL order
+        if settings.sl_usd > 0:
+            if pos_side == "long":
+                sl_price = entry_price - settings.sl_usd
+            else:
+                sl_price = entry_price + settings.sl_usd
+            # Round to price tick
+            sl_price = round(
+                math.floor(sl_price / price_tick) * price_tick
+                if close_side == "buy"
+                else math.ceil(sl_price / price_tick) * price_tick,
+                price_decimals,
+            )
+            await self._place_reduce_only_limit(
+                close_side, sl_price, rounded_qty, "sl"
+            )
+
+    async def _place_reduce_only_limit(
+        self, side: str, price: float, qty: float, label: str
+    ) -> None:
+        """Place a single reduce-only limit order (for TP or SL)."""
+        payload = {
+            "symbol": settings.symbol,
+            "side": side,
+            "order_type": "limit",
+            "qty": str(qty),
+            "price": str(price),
+            "time_in_force": "gtc",
+            "reduce_only": True,
+        }
+        payload_str = json.dumps(payload)
+        headers = await auth_manager.get_full_headers(payload_str)
+        headers["Content-Type"] = "application/json"
+
+        try:
+            resp = await self._client.post(
+                "/api/new_order",
+                content=payload_str,
+                headers=headers,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            order_id = data.get("order_id", data.get("id", data.get("request_id", "unknown")))
+            log.info(
+                f"engine.{label}_order_placed",
+                order_id=order_id,
+                side=side,
+                price=price,
+                qty=qty,
+            )
+            if isinstance(order_id, int):
+                self._tp_sl_order_ids.add(order_id)
+        except httpx.HTTPStatusError as e:
+            log.error(
+                f"engine.{label}_order_failed",
+                status=e.response.status_code,
+                body=e.response.text[:200],
+            )
+        except Exception as e:
+            log.error(f"engine.{label}_order_error", error=str(e))
+
+    async def _fetch_total_volume(self) -> None:
+        """Fetch all-time trade volume from the exchange API."""
+        try:
+            total_volume = 0.0
+            page = 1
+            page_size = 500
+
+            while True:
+                headers = await auth_manager.get_full_headers("")
+                resp = await self._client.get(
+                    "/api/query_trades",
+                    params={
+                        "symbol": settings.symbol,
+                        "page_size": page_size,
+                        "page": page,
+                    },
+                    headers=headers,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                trades = data.get("result", [])
+
+                if not trades:
+                    break
+
+                for trade in trades:
+                    value = float(trade.get("value", 0))
+                    total_volume += value
+
+                # Check if we got all trades
+                total_count = data.get("total", 0)
+                fetched_so_far = page * page_size
+                if fetched_so_far >= total_count or len(trades) < page_size:
+                    break
+                page += 1
+
+            self._total_volume_usd = total_volume
+            self._last_volume_fetch = time.time()
+            log.info(
+                "engine.volume_fetched",
+                total_volume_usd=round(total_volume, 2),
+                symbol=settings.symbol,
+            )
+        except Exception as e:
+            log.error("engine.volume_fetch_error", error=str(e))
 
     async def _place_market_close(self, side: str, qty: float) -> None:
         """Place a reduce_only market order to close a position."""

@@ -46,8 +46,8 @@ export default function Dashboard() {
                         currentBidNotional={state.bid_notional}
                         currentAskNotional={state.ask_notional}
                         currentRequoteBps={state.requote_threshold_bps}
-                        currentTpBps={state.tp_bps}
-                        currentSlBps={state.sl_bps}
+                        currentTpUsd={state.tp_usd}
+                        currentSlUsd={state.sl_usd}
                         botStatus={state.status}
                     />
                 </div>
@@ -98,58 +98,9 @@ export default function Dashboard() {
 
                     {/* Uptime */}
                     <div style={{ marginTop: '20px' }}>
-                        <UptimeBar uptime={state.uptime} closedPositions={state.closed_positions} />
+                        <UptimeBar uptime={state.uptime} />
                     </div>
 
-                    {/* Positions */}
-                    <div style={{ marginTop: '20px' }}>
-                        <h3 className="heading-lg" style={{ marginBottom: '10px' }}>POSITIONS</h3>
-                        {state.closed_positions.length > 0 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                {state.closed_positions.slice(-5).reverse().map((pos, i) => {
-                                    const isLong = pos.side === 'long';
-                                    const ago = Math.floor(Date.now() / 1000 - pos.closed_at);
-                                    const agoStr = ago < 60 ? `${ago}s ago` : ago < 3600 ? `${Math.floor(ago / 60)}m ago` : `${Math.floor(ago / 3600)}h ago`;
-                                    return (
-                                        <div key={i} style={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            padding: '8px 12px',
-                                            background: isLong ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)',
-                                            borderLeft: `3px solid ${isLong ? '#22c55e' : '#ef4444'}`,
-                                        }}>
-                                            <span style={{
-                                                color: isLong ? '#22c55e' : '#ef4444',
-                                                fontWeight: 700,
-                                                fontFamily: 'var(--font-mono)',
-                                                fontSize: '0.7rem',
-                                                letterSpacing: '0.05em',
-                                            }}>
-                                                {pos.side.toUpperCase()} → {pos.close_side.toUpperCase()}
-                                            </span>
-                                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', opacity: 0.8 }}>
-                                                {pos.qty} @ ${pos.entry_price.toLocaleString()}
-                                            </span>
-                                            <span style={{
-                                                fontFamily: 'var(--font-mono)',
-                                                fontSize: '0.6rem',
-                                                opacity: 0.4,
-                                                background: 'rgba(255,255,255,0.05)',
-                                                padding: '2px 6px',
-                                            }}>
-                                                CLOSED {agoStr}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <div style={{ fontSize: '0.7rem', opacity: 0.4, fontFamily: 'var(--font-mono)' }}>
-                                NO CLOSED POSITIONS
-                            </div>
-                        )}
-                    </div>
 
                     {/* Orders Table */}
                     <div style={{ marginTop: '20px', flex: 1 }}>
@@ -209,6 +160,16 @@ export default function Dashboard() {
                             </div>
                         </div>
 
+                        {/* Total Volume */}
+                        <div className="metric-block metric-block-light">
+                            <div className="metric-label" style={{ marginBottom: '6px', color: 'rgba(230,228,216,0.6)' }}>
+                                TOTAL VOLUME
+                            </div>
+                            <div className="metric-value" style={{ color: '#E6E4D8' }}>
+                                ${state.total_volume_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                        </div>
+
                         {/* Refresh Interval */}
                         <div className="metric-block metric-block-light">
                             <div className="metric-label" style={{ marginBottom: '6px', color: 'rgba(230,228,216,0.6)' }}>
@@ -243,7 +204,7 @@ export default function Dashboard() {
                     <div style={{ marginTop: 'auto', paddingTop: '24px' }}>
                         <hr className="divider" style={{ borderColor: 'rgba(230,228,216,0.2)' }} />
                         <div style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(230,228,216,0.4)' }}>
-                            MAKERBOT V2.0.2
+                            MAKERBOT V3.0.0
                         </div>
                     </div>
                 </div>
