@@ -96,6 +96,7 @@ class TradingEngine:
         self._client = httpx.AsyncClient(
             base_url=settings.standx_api_base,
             timeout=10.0,
+            verify=False,
         )
 
     @property
